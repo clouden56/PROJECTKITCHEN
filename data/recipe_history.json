@@ -170,5 +170,241 @@
       "allergen_safe": true
     },
     "created_at": "2026-09-21 07:26:06"
+  },
+  {
+    "recipe": {
+      "recipe_name": "Chicken, Tomato & Fluffy Egg Rice Stir-Fry",
+      "meal_type": "Lunch",
+      "estimated_cook_time_mins": 25,
+      "ingredients_used": [
+        "Chicken breast",
+        "rice",
+        "Eggs",
+        "Tomatoes",
+        "Whole Milk",
+        "Olive Oil"
+      ],
+      "missing_ingredients": [
+        "Salt",
+        "Black pepper"
+      ],
+      "instructions": [
+        "Rinse 1 cup of rice and cook in boiling salted water for 12-15 minutes until tender, then drain.",
+        "While rice is cooking, whisk 3 eggs with 2 tablespoons of whole milk, salt, and pepper in a small bowl.",
+        "Cut 2 chicken breasts into bite-sized cubes and dice 2 tomatoes.",
+        "Heat 1 tablespoon of olive oil in a wok or large skillet over medium-high heat. Add the chicken breast cubes and stir-fry for 5 to 7 minutes until fully cooked, then remove and set aside.",
+        "Pour the egg and milk mixture into the hot skillet. Soft scramble for 1-2 minutes until gently set, then transfer to the plate with chicken.",
+        "Add another tablespoon of olive oil to the skillet and sauté diced tomatoes for 2 minutes until slightly softened.",
+        "Add cooked rice, cooked chicken, and scrambled eggs back into the skillet. Stir-fry everything together over high heat for 2 minutes to combine flavors.",
+        "Season with salt and pepper to taste, serve hot."
+      ],
+      "waste_reduction_notes": "This recipe utilizes Whole Milk, Eggs, and Tomatoes, which are among your earliest expiring ingredients (expiring Sept 22-23). Incorporating a splash of milk into the eggs adds fluffiness to the stir-fry while preventing dairy waste."
+    },
+    "evaluation": {
+      "outcome": "FLAGGED",
+      "status_code": "MISSING_SOME_INGREDIENTS",
+      "status_message": "Recipe approved with caution (86% match). Missing items: Salt, Black pepper.",
+      "match_ratio": 0.86,
+      "match_percentage": 86,
+      "matched_ingredients": [
+        "Chicken breast",
+        "rice",
+        "Eggs",
+        "Tomatoes",
+        "Whole Milk",
+        "Olive Oil"
+      ],
+      "missing_ingredients": [
+        "Salt",
+        "Black pepper"
+      ],
+      "expiry_priority_score": 100.0,
+      "rescued_items": [
+        {
+          "name": "Eggs",
+          "days_until_expiry": 2,
+          "quantity": 6,
+          "unit": "pcs"
+        },
+        {
+          "name": "Whole Milk",
+          "days_until_expiry": 1,
+          "quantity": 500,
+          "unit": "ml"
+        },
+        {
+          "name": "Tomatoes",
+          "days_until_expiry": 2,
+          "quantity": 3,
+          "unit": "pcs"
+        }
+      ],
+      "waste_diverted_grams": 1400,
+      "is_within_time": true,
+      "allergen_safe": true
+    },
+    "created_at": "2026-09-21 07:55:02"
+  },
+  {
+    "recipe": {
+      "recipe_name": "Quick Creamy Tomato Cheddar Soup with Toast Croutons",
+      "meal_type": "Lunch",
+      "estimated_cook_time_mins": 12,
+      "ingredients_used": [
+        "3 Tomatoes",
+        "300 ml Whole Milk",
+        "100 g Cheddar Cheese",
+        "2 Eggs",
+        "2 slices Bread",
+        "1 tbsp Olive Oil"
+      ],
+      "missing_ingredients": [
+        "Salt and black pepper to taste"
+      ],
+      "instructions": [
+        "Finely dice the fresh tomatoes. Cut the bread slices into small crouton-sized cubes.",
+        "Heat olive oil in a medium saucepan over medium-high heat. Add the diced tomatoes and sauté for 3-4 minutes until softened and juicy.",
+        "Pour in the whole milk and bring to a gentle simmer (do not boil). Lower heat to medium-low.",
+        "Shred the cheddar cheese and stir it into the soup until fully melted and creamy.",
+        "Whisk the eggs in a small bowl, then slowly drizzle into the simmering soup while gently stirring to create soft ribbons.",
+        "In a separate small pan, toast the bread cubes over medium heat for 2-3 minutes until golden and crispy.",
+        "Season soup with salt and pepper to taste, ladle into a bowl, and top with crispy toast croutons."
+      ],
+      "waste_reduction_notes": "Prioritizes ingredients expiring soonest: Whole Milk (expiring Sept 22), Tomatoes and Eggs (expiring Sept 23), and Cheddar Cheese (expiring Sept 24)."
+    },
+    "evaluation": {
+      "outcome": "FLAGGED",
+      "status_code": "MISSING_SOME_INGREDIENTS",
+      "status_message": "Recipe approved with caution (86% match). Missing items: Salt and black pepper to taste.",
+      "match_ratio": 0.86,
+      "match_percentage": 86,
+      "matched_ingredients": [
+        "3 Tomatoes",
+        "300 ml Whole Milk",
+        "100 g Cheddar Cheese",
+        "2 Eggs",
+        "2 slices Bread",
+        "1 tbsp Olive Oil"
+      ],
+      "missing_ingredients": [
+        "Salt and black pepper to taste"
+      ],
+      "expiry_priority_score": 100.0,
+      "rescued_items": [
+        {
+          "name": "Eggs",
+          "days_until_expiry": 2,
+          "quantity": 6,
+          "unit": "pcs"
+        },
+        {
+          "name": "Cheddar Cheese",
+          "days_until_expiry": 3,
+          "quantity": 150,
+          "unit": "g"
+        },
+        {
+          "name": "Whole Milk",
+          "days_until_expiry": 1,
+          "quantity": 500,
+          "unit": "ml"
+        },
+        {
+          "name": "Bread",
+          "days_until_expiry": 4,
+          "quantity": 4,
+          "unit": "slices"
+        },
+        {
+          "name": "Tomatoes",
+          "days_until_expiry": 2,
+          "quantity": 3,
+          "unit": "pcs"
+        }
+      ],
+      "waste_diverted_grams": 1550,
+      "is_within_time": true,
+      "allergen_safe": true
+    },
+    "created_at": "2026-09-21 07:58:17"
+  },
+  {
+    "recipe": {
+      "recipe_name": "Savory Cheddar and Tomato French Toast",
+      "meal_type": "Breakfast",
+      "estimated_cook_time_mins": 12,
+      "ingredients_used": [
+        "4 slices Bread",
+        "3 pcs Eggs",
+        "100 ml Whole Milk",
+        "75 g Cheddar Cheese",
+        "2 pcs Tomatoes",
+        "1 tbsp Olive Oil"
+      ],
+      "missing_ingredients": [],
+      "instructions": [
+        "Dice the tomatoes and grate or slice the cheddar cheese.",
+        "In a wide bowl, whisk together the eggs and whole milk until fully combined.",
+        "Heat the olive oil in a pan over medium heat.",
+        "Dip each bread slice into the egg and milk mixture, allowing both sides to absorb the liquid.",
+        "Place the dipped bread slices in the pan using your spatula and cook for 2 to 3 minutes until the bottom is golden brown.",
+        "Flip the bread slices over, immediately sprinkle the chopped tomatoes and cheddar cheese on top of each slice.",
+        "Cover the pan briefly or reduce heat to melt the cheese while the bottom cooks for another 2 to 3 minutes, then serve warm."
+      ],
+      "waste_reduction_notes": "This recipe prioritizes your soonest-expiring fresh ingredients: Whole Milk (Sept 22), Eggs and Tomatoes (Sept 23), Cheddar Cheese (Sept 24), and Bread (Sept 25), effectively using them up before they spoil while adhering to your 15-minute cooking window."
+    },
+    "evaluation": {
+      "outcome": "ACCEPTED",
+      "status_code": "OPTIMAL_MATCH",
+      "status_message": "Recipe perfectly matches your fridge ingredients and cooking parameters!",
+      "match_ratio": 1.0,
+      "match_percentage": 100,
+      "matched_ingredients": [
+        "4 slices Bread",
+        "3 pcs Eggs",
+        "100 ml Whole Milk",
+        "75 g Cheddar Cheese",
+        "2 pcs Tomatoes",
+        "1 tbsp Olive Oil"
+      ],
+      "missing_ingredients": [],
+      "expiry_priority_score": 100.0,
+      "rescued_items": [
+        {
+          "name": "Eggs",
+          "days_until_expiry": 2,
+          "quantity": 6,
+          "unit": "pcs"
+        },
+        {
+          "name": "Cheddar Cheese",
+          "days_until_expiry": 3,
+          "quantity": 150,
+          "unit": "g"
+        },
+        {
+          "name": "Whole Milk",
+          "days_until_expiry": 1,
+          "quantity": 500,
+          "unit": "ml"
+        },
+        {
+          "name": "Bread",
+          "days_until_expiry": 4,
+          "quantity": 4,
+          "unit": "slices"
+        },
+        {
+          "name": "Tomatoes",
+          "days_until_expiry": 2,
+          "quantity": 3,
+          "unit": "pcs"
+        }
+      ],
+      "waste_diverted_grams": 1550,
+      "is_within_time": true,
+      "allergen_safe": true
+    },
+    "created_at": "2026-09-21 08:07:39"
   }
 ]
