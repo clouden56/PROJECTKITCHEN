@@ -1,0 +1,51 @@
+[
+  {
+    "id": "ing-001",
+    "name": "Eggs",
+    "quantity": 6,
+    "unit": "pcs",
+    "location": "Fridge",
+    "expiry_date": "2026-09-23"
+  },
+  {
+    "id": "ing-002",
+    "name": "Cheddar Cheese",
+    "quantity": 150,
+    "unit": "g",
+    "location": "Fridge",
+    "expiry_date": "2026-09-24"
+  },
+  {
+    "id": "ing-003",
+    "name": "Whole Milk",
+    "quantity": 500,
+    "unit": "ml",
+    "location": "Fridge",
+    "expiry_date": "2026-09-22"
+  },
+  {
+    "id": "ing-004",
+    "name": "Bread",
+    "quantity": 4,
+    "unit": "slices",
+    "location": "Pantry",
+    "expiry_date": "2026-09-25"
+  },
+  {
+    "id": "ing-005",
+    "name": "Tomatoes",
+    "quantity": 3,
+    "unit": "pcs",
+    "location": "Fridge",
+    "expiry_date": "2026-09-23"
+  },
+  {
+    "id": "ing-006",
+    "name": "Olive Oil",
+    "quantity": 250,
+    "unit": "ml",
+    "location": "Pantry",
+    "expiry_date": "2026-12-31"
+  }
+]
+

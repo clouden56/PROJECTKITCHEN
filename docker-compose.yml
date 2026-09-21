@@ -1,0 +1,25 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: projectkitchen:latest
+    container_name: fridge_recipe_tracker
+    stdin_open: true
+    tty: true
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    command: ["python", "main.py"]
+
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: projectkitchen:latest
+    container_name: fridge_recipe_tracker_test
+    env_file:
+      - .env
+    command: ["python", "tests/test_pipeline.py"]
+
