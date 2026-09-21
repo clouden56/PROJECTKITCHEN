@@ -46,6 +46,21 @@
     "unit": "ml",
     "location": "Pantry",
     "expiry_date": "2026-12-31"
+  },
+  {
+    "name": "Chicken breast",
+    "location": "Fridge",
+    "quantity": 6.0,
+    "unit": "pcs",
+    "expiry_date": "2026-12-10",
+    "id": "ing-007"
+  },
+  {
+    "name": "rice",
+    "location": "Pantry",
+    "quantity": 500.0,
+    "unit": "g",
+    "expiry_date": "2027-01-01",
+    "id": "ing-009"
   }
 ]
-

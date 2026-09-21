@@ -1,2 +1,174 @@
-[]
-
+[
+  {
+    "recipe": {
+      "recipe_name": "Creamy Tomato Soup with Cheddar Toast and Fried Egg",
+      "meal_type": "Lunch",
+      "estimated_cook_time_mins": 25,
+      "ingredients_used": [
+        "3 Tomatoes",
+        "250 ml Whole Milk",
+        "150 g Cheddar Cheese",
+        "4 slices Bread",
+        "2 Eggs",
+        "2 tbsp Olive Oil"
+      ],
+      "missing_ingredients": [
+        "Salt to taste",
+        "Black pepper to taste"
+      ],
+      "instructions": [
+        "Dice the fresh tomatoes. Heat 1 tbsp of olive oil in a saucepan over medium heat, add the tomatoes, and cook until soft and juicy (about 8 minutes).",
+        "Pour in the whole milk and lower the heat to simmer gently for 5 minutes. Stir in half of the cheddar cheese (75g) until fully melted into a creamy soup base, then season with salt and pepper.",
+        "Brush the bread slices with remaining olive oil and toast them in a skillet over medium heat. Top with the remaining cheddar cheese, cover the skillet, and let it melt.",
+        "In the same skillet, gently fry the eggs until the whites are set but yolks remain soft.",
+        "Ladle the creamy tomato soup into bowls, top each with a fried egg, and serve alongside the warm cheddar toast."
+      ],
+      "waste_reduction_notes": "This recipe prioritizes Whole Milk (expiring 2026-09-22) and Tomatoes (expiring 2026-09-23) to prevent spoilage, while efficiently using available bread, cheddar, and eggs to craft a complete lunch."
+    },
+    "evaluation": {
+      "outcome": "FLAGGED",
+      "status_code": "MISSING_SOME_INGREDIENTS",
+      "status_message": "Recipe approved with caution (75% match). Missing items: Salt to taste, Black pepper to taste.",
+      "match_ratio": 0.75,
+      "match_percentage": 75,
+      "matched_ingredients": [
+        "3 Tomatoes",
+        "250 ml Whole Milk",
+        "150 g Cheddar Cheese",
+        "4 slices Bread",
+        "2 Eggs",
+        "2 tbsp Olive Oil"
+      ],
+      "missing_ingredients": [
+        "Salt to taste",
+        "Black pepper to taste"
+      ],
+      "expiry_priority_score": 100.0,
+      "rescued_items": [
+        {
+          "name": "Eggs",
+          "days_until_expiry": 2,
+          "quantity": 6,
+          "unit": "pcs"
+        },
+        {
+          "name": "Cheddar Cheese",
+          "days_until_expiry": 3,
+          "quantity": 150,
+          "unit": "g"
+        },
+        {
+          "name": "Whole Milk",
+          "days_until_expiry": 1,
+          "quantity": 500,
+          "unit": "ml"
+        },
+        {
+          "name": "Bread",
+          "days_until_expiry": 4,
+          "quantity": 4,
+          "unit": "slices"
+        },
+        {
+          "name": "Tomatoes",
+          "days_until_expiry": 2,
+          "quantity": 3,
+          "unit": "pcs"
+        }
+      ],
+      "waste_diverted_grams": 1550,
+      "is_within_time": true,
+      "allergen_safe": true
+    },
+    "created_at": "2026-09-21 07:10:11"
+  },
+  {
+    "recipe": {
+      "recipe_name": "Air Fryer Cheesy Chicken & Tomato Bread Strata",
+      "meal_type": "Dinner",
+      "estimated_cook_time_mins": 35,
+      "ingredients_used": [
+        "Eggs",
+        "Cheddar Cheese",
+        "Whole Milk",
+        "Bread",
+        "Tomatoes",
+        "Olive Oil",
+        "Chicken breast"
+      ],
+      "missing_ingredients": [
+        "Salt",
+        "Black Pepper"
+      ],
+      "instructions": [
+        "Dice 1 chicken breast into small bite-sized pieces and toss with 1 tablespoon of olive oil, salt, and pepper.",
+        "Preheat the air fryer to 380°F (190°C) and cook the diced chicken for 8 minutes until cooked through, then set aside.",
+        "Cut the 4 slices of bread into 1-inch cubes and dice the tomatoes.",
+        "In a mixing bowl, whisk together 4 eggs and 250 ml of whole milk until well combined.",
+        "Grease an air-fryer-safe baking dish or tin with a little olive oil. Layer in the bread cubes, cooked chicken, and diced tomatoes.",
+        "Pour the egg and milk mixture evenly over the bread and tomatoes, pressing down gently so the bread absorbs the liquid.",
+        "Shred and sprinkle 100g of cheddar cheese evenly over the top.",
+        "Place the dish into the air fryer basket and bake at 330°F (165°C) for 18 to 20 minutes, until the custard is set and the cheesy top is golden brown.",
+        "Let it rest for 5 minutes before serving hot."
+      ],
+      "waste_reduction_notes": "This recipe directly uses items expiring soonest: Whole Milk (expiring Sept 22), Eggs (Sept 23), Tomatoes (Sept 23), and Cheddar Cheese (Sept 24). Combining them into a savory baked strata prevents these highly perishable dairy and produce items from going to waste."
+    },
+    "evaluation": {
+      "outcome": "FLAGGED",
+      "status_code": "MISSING_SOME_INGREDIENTS",
+      "status_message": "Recipe approved with caution (88% match). Missing items: Salt, Black Pepper.",
+      "match_ratio": 0.88,
+      "match_percentage": 88,
+      "matched_ingredients": [
+        "Eggs",
+        "Cheddar Cheese",
+        "Whole Milk",
+        "Bread",
+        "Tomatoes",
+        "Olive Oil",
+        "Chicken breast"
+      ],
+      "missing_ingredients": [
+        "Salt",
+        "Black Pepper"
+      ],
+      "expiry_priority_score": 100.0,
+      "rescued_items": [
+        {
+          "name": "Eggs",
+          "days_until_expiry": 2,
+          "quantity": 6,
+          "unit": "pcs"
+        },
+        {
+          "name": "Cheddar Cheese",
+          "days_until_expiry": 3,
+          "quantity": 150,
+          "unit": "g"
+        },
+        {
+          "name": "Whole Milk",
+          "days_until_expiry": 1,
+          "quantity": 500,
+          "unit": "ml"
+        },
+        {
+          "name": "Bread",
+          "days_until_expiry": 4,
+          "quantity": 4,
+          "unit": "slices"
+        },
+        {
+          "name": "Tomatoes",
+          "days_until_expiry": 2,
+          "quantity": 3,
+          "unit": "pcs"
+        }
+      ],
+      "waste_diverted_grams": 1550,
+      "is_within_time": true,
+      "allergen_safe": true
+    },
+    "created_at": "2026-09-21 07:26:06"
+  }
+]
