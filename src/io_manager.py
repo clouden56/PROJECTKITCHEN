@@ -183,18 +183,25 @@ def prompt_new_ingredient() -> dict:
 
 def prompt_recipe_generation_criteria() -> dict:
     """
-    Gathers structured preferences from user for recipe generation.
+    Gathers structured preferences from user for recipe generation,
+    including specific mandatory ingredients and cooking style.
     """
     print_banner("AI Recipe Recommendation Request")
     meal = prompt_meal_type()
     cook_time = prompt_positive_number("Maximum Cooking Time in minutes (e.g., 15, 30, 45)", is_float=False)
     allergies = prompt_allergies()
+    mandatory_raw = prompt_string(
+        "Specific ingredient(s) you MUST include? (e.g. Eggs, Cheese, or press Enter for any)",
+        allow_empty=True
+    )
+    mandatory_list = [m.strip() for m in mandatory_raw.split(",") if m.strip()] if mandatory_raw else []
     notes = prompt_string("Any cooking style preferences? (e.g., stir-fry, soup, one-pot, or press Enter)", allow_empty=True)
 
     return {
         "meal_type": meal,
         "max_cook_time_mins": int(cook_time),
         "allergies": allergies,
+        "mandatory_ingredients": mandatory_list,
         "additional_notes": notes
     }
 
@@ -246,7 +253,7 @@ def display_inventory(inventory: list[dict]) -> None:
 def display_recipe_card(recipe: dict, evaluation: dict) -> None:
     """
     Renders a formatted card displaying the AI-generated recipe alongside
-    the domain logic evaluation rules.
+    the required kitchen tools, ingredients, and domain logic evaluation rules.
     """
     print_banner(f"Recipe: {recipe.get('recipe_name', 'Untitled')}")
     outcome = evaluation.get("outcome", "UNKNOWN")
@@ -260,6 +267,13 @@ def display_recipe_card(recipe: dict, evaluation: dict) -> None:
     print(f"Expiry Priority : {evaluation.get('expiry_priority_score', 0)} / 100 (Urgency score)")
     print(f"Food Waste Saved: ~{evaluation.get('waste_diverted_grams', 0)} grams diverted from disposal")
 
+    # Display Required Kitchen Tools
+    tools = recipe.get("required_tools", [])
+    if tools:
+        print("\nRequired Kitchen Tools & Equipment:")
+        for t in tools:
+            print(f"  [Tool] {t}")
+
     print("\nIngredients Used From Your Kitchen:")
     for ing in recipe.get("ingredients_used", []):
         print(f"  + {ing}")
@@ -271,6 +285,12 @@ def display_recipe_card(recipe: dict, evaluation: dict) -> None:
             print(f"  - {m}")
     else:
         print("\nMissing Ingredients: None! You have everything required.")
+
+    # Status on mandatory ingredients
+    if evaluation.get("missing_mandatory"):
+        print(f"\n[!] Note: Missing requested ingredient(s): {', '.join(evaluation.get('missing_mandatory'))}")
+    elif evaluation.get("mandatory_met") and evaluation.get("missing_mandatory") is not None:
+        print("\n[OK] All requested must-have ingredients are included in this dish!")
 
     print("\nCooking Instructions:")
     for idx, step in enumerate(recipe.get("instructions", []), 1):
@@ -291,7 +311,7 @@ def display_recipe_card(recipe: dict, evaluation: dict) -> None:
 
 def display_recipe_history(history: list[dict]) -> None:
     """
-    Renders historical recipe records.
+    Renders historical recipe records including required tools.
     """
     print_banner("Saved Recipe History")
     if not history:
@@ -306,6 +326,8 @@ def display_recipe_history(history: list[dict]) -> None:
         print(f"\n[{idx}] {recipe.get('recipe_name', 'Unnamed Recipe')} (Saved on: {created_at})")
         print(f"    Meal Type    : {recipe.get('meal_type')} | Time: {recipe.get('estimated_cook_time_mins')} mins")
         print(f"    Match Ratio  : {eval_data.get('match_percentage', 0)}% | Outcome: {eval_data.get('outcome')}")
+        tools_str = ", ".join(recipe.get("required_tools", [])) or "Standard Utensils"
+        print(f"    Tools Needed : {tools_str}")
         print(f"    Ingredients  : {', '.join(recipe.get('ingredients_used', []))}")
         print("-" * 50)
 

@@ -160,6 +160,7 @@ def test_ai_manager_schema_validation() -> bool:
         "recipe_name": "Cheese Omelette",
         "meal_type": "Breakfast",
         "estimated_cook_time_mins": 10,
+        "required_tools": ["Non-stick skillet", "Spatula", "Mixing bowl"],
         "ingredients_used": ["Eggs", "Cheddar Cheese"],
         "missing_ingredients": ["Black Pepper"],
         "instructions": [
@@ -174,12 +175,19 @@ def test_ai_manager_schema_validation() -> bool:
     assert is_valid is True, f"Valid payload rejected: {err}"
     assert cleaned["recipe_name"] == "Cheese Omelette"
     assert len(cleaned["instructions"]) == 3
+    assert len(cleaned["required_tools"]) == 3
+    assert "Spatula" in cleaned["required_tools"]
 
     # Malformed cases
     missing_key = dict(valid_payload)
     del missing_key["instructions"]
     is_valid_bad, _, _ = ai_manager.validate_recipe_schema(missing_key)
     assert is_valid_bad is False, "Expected rejection for missing required field"
+
+    missing_tools = dict(valid_payload)
+    del missing_tools["required_tools"]
+    is_valid_tools_bad, _, _ = ai_manager.validate_recipe_schema(missing_tools)
+    assert is_valid_tools_bad is False, "Expected rejection for missing required_tools"
 
     wrong_type = dict(valid_payload)
     wrong_type["estimated_cook_time_mins"] = "ten minutes"
@@ -196,7 +204,8 @@ def test_ai_manager_schema_validation() -> bool:
 
 def test_logic_manager_rules() -> bool:
     """
-    Tests allergen filtering, expiry prioritization, and multi-condition evaluation outcomes.
+    Tests allergen filtering, expiry prioritization, mandatory ingredient checks,
+    and multi-condition evaluation outcomes.
     """
     today = datetime.now().date()
     inventory = [
@@ -254,12 +263,31 @@ def test_logic_manager_rules() -> bool:
         },
         inventory=inventory,
         max_cook_time_mins=15,
-        user_allergies=[]
+        user_allergies=[],
+        mandatory_ingredients=["Eggs"]
     )
     assert eval_accepted["outcome"] == "ACCEPTED"
     assert eval_accepted["match_ratio"] == 1.0
+    assert eval_accepted["mandatory_met"] is True
 
-    # 4. Multi-condition rule: REJECTED due to allergen
+    # 4. Mandatory ingredient requested but missing -> FLAGGED
+    eval_missing_mandatory = logic_manager.evaluate_recipe(
+        recipe={
+            "recipe_name": "Toast with Butter",
+            "estimated_cook_time_mins": 5,
+            "ingredients_used": ["Bread"],
+            "missing_ingredients": []
+        },
+        inventory=inventory,
+        max_cook_time_mins=15,
+        user_allergies=[],
+        mandatory_ingredients=["Eggs"]
+    )
+    assert eval_missing_mandatory["outcome"] == "FLAGGED"
+    assert eval_missing_mandatory["status_code"] == "MISSING_MANDATORY_INGREDIENT"
+    assert "Eggs" in eval_missing_mandatory["missing_mandatory"]
+
+    # 5. Multi-condition rule: REJECTED due to allergen
     eval_rejected_allergen = logic_manager.evaluate_recipe(
         recipe={
             "recipe_name": "Cheese Delight",
@@ -274,7 +302,7 @@ def test_logic_manager_rules() -> bool:
     assert eval_rejected_allergen["outcome"] == "REJECTED"
     assert eval_rejected_allergen["status_code"] == "ALLERGEN_CONTAMINATION"
 
-    # 5. Multi-condition rule: FLAGGED due to cooking time
+    # 6. Multi-condition rule: FLAGGED due to cooking time
     eval_flagged_time = logic_manager.evaluate_recipe(
         recipe={
             "recipe_name": "Slow Baked Eggs",
@@ -289,7 +317,7 @@ def test_logic_manager_rules() -> bool:
     assert eval_flagged_time["outcome"] == "FLAGGED"
     assert eval_flagged_time["status_code"] == "EXCEEDS_TIME_LIMIT"
 
-    # 6. Multi-condition rule: FLAGGED due to missing ingredient with sufficient match ratio
+    # 7. Multi-condition rule: FLAGGED due to missing ingredient with sufficient match ratio
     eval_flagged_missing = logic_manager.evaluate_recipe(
         recipe={
             "recipe_name": "Egg Mayo Toast",

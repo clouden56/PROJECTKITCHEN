@@ -55,11 +55,13 @@ def build_recipe_prompt(
     meal_type: str,
     max_cook_time_mins: int,
     allergies: list[str],
-    additional_notes: str = ""
+    additional_notes: str = "",
+    mandatory_ingredients: list[str] = None
 ) -> str:
     """
     Constructs a detailed structured prompt instructing the AI to output
-    a valid JSON recipe maximizing the use of near-expiry ingredients.
+    a valid JSON recipe maximizing the use of near-expiry ingredients,
+    including kitchen tools and mandatory user ingredients.
     """
     items_desc = []
     for item in inventory_items:
@@ -72,6 +74,7 @@ def build_recipe_prompt(
 
     items_text = "\n".join(items_desc) if items_desc else "No ingredients provided."
     allergies_text = ", ".join(allergies) if allergies else "None"
+    mandatory_text = ", ".join(mandatory_ingredients) if mandatory_ingredients else "None (chef choice from inventory)"
 
     prompt = f"""You are a professional culinary chef and food sustainability assistant.
 The user has the following ingredients available in their fridge and pantry:
@@ -81,15 +84,17 @@ Constraints & Preferences:
 - Meal Type: {meal_type}
 - Target Max Cooking Time: {max_cook_time_mins} minutes
 - User Allergies / Restrictions to avoid: {allergies_text}
-- Additional Notes: {additional_notes if additional_notes else "Prioritize using ingredients expiring soonest."}
+- MUST-INCLUDE / Specific Ingredients: {mandatory_text}
+- Additional Cooking Style / Notes: {additional_notes if additional_notes else "Prioritize using ingredients expiring soonest."}
 
-Generate an optimal recipe that maximizes usage of available ingredients (especially those expiring soonest) and minimizes food waste.
+Generate an optimal recipe that satisfies the must-include ingredients, maximizes usage of available ingredients (especially those expiring soonest), and minimizes food waste.
 
 You MUST respond strictly with a valid JSON object conforming to this schema:
 {{
   "recipe_name": "string (name of dish)",
   "meal_type": "string ({meal_type})",
   "estimated_cook_time_mins": integer,
+  "required_tools": ["string (e.g. Non-stick Skillet, Spatula, Chef Knife, Whisk)"],
   "ingredients_used": ["string (ingredient 1)", "string (ingredient 2)"],
   "missing_ingredients": ["string (ingredient needed but not in inventory)"],
   "instructions": [
@@ -177,6 +182,7 @@ def validate_recipe_schema(recipe_data: Any) -> tuple[bool, dict, str]:
         "recipe_name": str,
         "meal_type": str,
         "estimated_cook_time_mins": (int, float),
+        "required_tools": list,
         "ingredients_used": list,
         "missing_ingredients": list,
         "instructions": list,
@@ -190,10 +196,15 @@ def validate_recipe_schema(recipe_data: Any) -> tuple[bool, dict, str]:
             return False, {}, f"Field '{key}' has invalid type {type(recipe_data[key])}, expected {expected_type}"
 
     # Clean and cast fields
+    cleaned_tools = [str(t).strip() for t in recipe_data.get("required_tools", []) if str(t).strip()]
+    if not cleaned_tools:
+        cleaned_tools = ["Standard cooking utensils (e.g. pan, knife, cutting board)"]
+
     cleaned = {
         "recipe_name": str(recipe_data["recipe_name"]).strip(),
         "meal_type": str(recipe_data["meal_type"]).strip(),
         "estimated_cook_time_mins": int(recipe_data["estimated_cook_time_mins"]),
+        "required_tools": cleaned_tools,
         "ingredients_used": [str(i).strip() for i in recipe_data["ingredients_used"] if str(i).strip()],
         "missing_ingredients": [str(i).strip() for i in recipe_data["missing_ingredients"] if str(i).strip()],
         "instructions": [str(s).strip() for s in recipe_data["instructions"] if str(s).strip()],
@@ -246,11 +257,12 @@ def request_recipe_from_ai(
     max_cook_time_mins: int,
     allergies: list[str],
     additional_notes: str = "",
+    mandatory_ingredients: list[str] = None,
     model: str = DEFAULT_MODEL
 ) -> tuple[bool, dict, str]:
     """
     Procedural facade orchestrating the AI request pipeline:
-    1. Builds prompt
+    1. Builds prompt with optional mandatory ingredients and required kitchen tools
     2. Calls Gemini API with fallback cascade and graceful retry
     3. Validates structured JSON schema
     4. Handles errors gracefully without crashing
@@ -266,7 +278,8 @@ def request_recipe_from_ai(
         meal_type=meal_type,
         max_cook_time_mins=max_cook_time_mins,
         allergies=allergies,
-        additional_notes=additional_notes
+        additional_notes=additional_notes,
+        mandatory_ingredients=mandatory_ingredients
     )
 
     models_to_try = [model] + [m for m in MODELS_CASCADE if m != model]

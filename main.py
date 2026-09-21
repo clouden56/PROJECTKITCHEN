@@ -96,7 +96,8 @@ def handle_generate_recipe(inventory_file: str, history_file: str) -> None:
         meal_type=criteria["meal_type"],
         max_cook_time_mins=criteria["max_cook_time_mins"],
         allergies=criteria["allergies"],
-        additional_notes=criteria["additional_notes"]
+        additional_notes=criteria["additional_notes"],
+        mandatory_ingredients=criteria.get("mandatory_ingredients", [])
     )
 
     if not success:
@@ -109,7 +110,8 @@ def handle_generate_recipe(inventory_file: str, history_file: str) -> None:
         recipe=recipe,
         inventory=inventory,
         max_cook_time_mins=criteria["max_cook_time_mins"],
-        user_allergies=criteria["allergies"]
+        user_allergies=criteria["allergies"],
+        mandatory_ingredients=criteria.get("mandatory_ingredients", [])
     )
 
     # 3. Data Layer: Persist record to recipe history

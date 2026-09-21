@@ -227,17 +227,41 @@ def estimate_food_waste_diverted(rescued_items: list[dict]) -> int:
     return total_grams
 
 
+def check_mandatory_ingredients(recipe: dict, mandatory_ingredients: list[str]) -> tuple[bool, list[str]]:
+    """
+    Verifies if all mandatory ingredients specified by the user are included
+    in the recipe's ingredients_used.
+    Returns: (all_met: bool, missing_mandatory: list[str])
+    """
+    if not mandatory_ingredients:
+        return True, []
+
+    recipe_used = recipe.get("ingredients_used", [])
+    missing = []
+
+    for req in mandatory_ingredients:
+        req_clean = req.strip()
+        if not req_clean:
+            continue
+        if not any(does_ingredient_match(req_clean, used) for used in recipe_used):
+            missing.append(req_clean)
+
+    return len(missing) == 0, missing
+
+
 def evaluate_recipe(
     recipe: dict,
     inventory: list[dict],
     max_cook_time_mins: int,
     user_allergies: list[str],
-    min_match_ratio: float = 0.50
+    min_match_ratio: float = 0.50,
+    mandatory_ingredients: list[str] = None
 ) -> dict:
     """
     Core Domain Rule: Multi-condition evaluation pipeline acting on AI output.
     Applies business logic combining allergen safety, time constraints, match threshold,
-    and expiry score to route into an outcome: ACCEPTED, FLAGGED, or REJECTED.
+    mandatory ingredients fulfillment, and expiry score to route into an outcome:
+    ACCEPTED, FLAGGED, or REJECTED.
     """
     # 1. Evaluate Allergen Safety
     is_safe, allergen_violations = evaluate_allergen_safety(recipe, user_allergies)
@@ -245,14 +269,17 @@ def evaluate_recipe(
     # 2. Match Ratio Calculation
     match_ratio, matched_ings, missing_ings = calculate_ingredient_match_ratio(recipe, inventory)
 
-    # 3. Expiry Priority Score & Rescued Items
+    # 3. Mandatory Ingredients Verification
+    mandatory_met, missing_mandatory = check_mandatory_ingredients(recipe, mandatory_ingredients or [])
+
+    # 4. Expiry Priority Score & Rescued Items
     expiry_score, rescued_items = calculate_expiry_priority_score(recipe, inventory)
 
-    # 4. Cook Time Constraint Check
+    # 5. Cook Time Constraint Check
     cook_time = recipe.get("estimated_cook_time_mins", 0)
     is_within_time = cook_time <= max_cook_time_mins
 
-    # 5. Waste Impact
+    # 6. Waste Impact
     waste_diverted_grams = estimate_food_waste_diverted(rescued_items)
 
     # --- Multi-Condition Decision Routing ---
@@ -266,6 +293,12 @@ def evaluate_recipe(
         status_message = (
             f"Ingredient match ratio ({int(match_ratio * 100)}%) is below the "
             f"minimum threshold of {int(min_match_ratio * 100)}%."
+        )
+    elif not mandatory_met:
+        outcome = "FLAGGED"
+        status_code = "MISSING_MANDATORY_INGREDIENT"
+        status_message = (
+            f"Recipe generated but missing your requested mandatory ingredient(s): {', '.join(missing_mandatory)}."
         )
     elif not is_within_time and match_ratio >= min_match_ratio:
         outcome = "FLAGGED"
@@ -294,6 +327,8 @@ def evaluate_recipe(
         "match_percentage": int(match_ratio * 100),
         "matched_ingredients": matched_ings,
         "missing_ingredients": missing_ings,
+        "mandatory_met": mandatory_met,
+        "missing_mandatory": missing_mandatory,
         "expiry_priority_score": expiry_score,
         "rescued_items": rescued_items,
         "waste_diverted_grams": waste_diverted_grams,
