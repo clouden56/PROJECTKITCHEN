@@ -399,5 +399,75 @@
       "allergen_safe": true
     },
     "created_at": "2026-09-22 08:12:43"
+  },
+  {
+    "recipe": {
+      "recipe_name": "Quick Cheesy Tomato Toast",
+      "meal_type": "Snack",
+      "estimated_cook_time_mins": 5,
+      "required_tools": [
+        "Non-stick Skillet",
+        "Spatula",
+        "Chef Knife"
+      ],
+      "ingredients_used": [
+        "Bread (2 slices)",
+        "Cheddar Cheese (40 g)",
+        "Tomatoes (1 pc)",
+        "Olive Oil (1 tbsp)"
+      ],
+      "missing_ingredients": [],
+      "instructions": [
+        "Slice the tomato into thin rounds and thinly slice or grate the cheddar cheese.",
+        "Drizzle olive oil into the skillet and heat over medium heat.",
+        "Place the bread slices in the skillet to toast for about 1 minute until lightly golden.",
+        "Flip the bread, place cheese slices on top, followed by tomato slices.",
+        "Cover the skillet with a lid for 1-2 minutes until the cheese is melted and bubbling, then serve immediately."
+      ],
+      "waste_reduction_notes": "This recipe uses tomatoes, bread, and cheddar cheese, which are among the soonest expiring items in your inventory, preventing unnecessary food waste in a quick 5-minute prep without using eggs."
+    },
+    "evaluation": {
+      "outcome": "FLAGGED",
+      "status_code": "MISSING_MANDATORY_INGREDIENT",
+      "status_message": "Recipe generated but missing your requested mandatory ingredient(s): no eggs.",
+      "match_ratio": 1.0,
+      "match_percentage": 100,
+      "matched_ingredients": [
+        "Bread (2 slices)",
+        "Cheddar Cheese (40 g)",
+        "Tomatoes (1 pc)",
+        "Olive Oil (1 tbsp)"
+      ],
+      "missing_ingredients": [],
+      "mandatory_met": false,
+      "missing_mandatory": [
+        "no eggs"
+      ],
+      "expiry_priority_score": 95.0,
+      "rescued_items": [
+        {
+          "name": "Cheddar Cheese",
+          "days_until_expiry": 2,
+          "quantity": 150,
+          "unit": "g"
+        },
+        {
+          "name": "Bread",
+          "days_until_expiry": 3,
+          "quantity": 4,
+          "unit": "slices"
+        },
+        {
+          "name": "Tomatoes",
+          "days_until_expiry": 1,
+          "quantity": 3,
+          "unit": "pcs"
+        }
+      ],
+      "waste_diverted_grams": 850,
+      "is_within_time": true,
+      "allergen_safe": true
+    },
+    "created_at": "2026-09-22 09:17:40"
   }
 ]
