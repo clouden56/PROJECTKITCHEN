@@ -62,5 +62,13 @@
     "unit": "g",
     "expiry_date": "2027-01-01",
     "id": "ing-009"
+  },
+  {
+    "name": "brocoli",
+    "location": "Fridge",
+    "quantity": 5.0,
+    "unit": "pcs",
+    "expiry_date": "2026-12-12",
+    "id": "ing-009"
   }
 ]

@@ -251,5 +251,153 @@
       "allergen_safe": true
     },
     "created_at": "2026-09-22 06:16:07"
+  },
+  {
+    "recipe": {
+      "recipe_name": "Quick Chicken, Broccoli, and Egg Fried Rice",
+      "meal_type": "Lunch",
+      "estimated_cook_time_mins": 25,
+      "required_tools": [
+        "Large Skillet or Wok",
+        "Medium Saucepan with Lid",
+        "Chef Knife",
+        "Cutting Board",
+        "Spatula",
+        "Small Mixing Bowl"
+      ],
+      "ingredients_used": [
+        "200 g Rice",
+        "2 pcs Chicken breast (diced)",
+        "1 pc Broccoli (florets and tender stem diced)",
+        "2 Eggs (beaten)",
+        "2 tbsp Olive Oil",
+        "1 pc Tomato (diced)"
+      ],
+      "missing_ingredients": [
+        "Water (for cooking rice)",
+        "Salt and black pepper",
+        "Soy sauce (optional)"
+      ],
+      "instructions": [
+        "Rinse 200 g of rice and combine with 350 ml of water in a saucepan. Bring to a boil, cover, reduce heat to low, and simmer for 12 minutes. Remove from heat and spread onto a plate to cool briefly.",
+        "While the rice cooks, cut the chicken breasts into bite-sized cubes. Chop the broccoli into small bite-sized florets, peeling and finely slicing the tender inner stem to minimize waste.",
+        "Heat 1 tablespoon of olive oil in a large skillet over medium-high heat. Add the diced chicken, season with salt and pepper, and sauté for 5 to 6 minutes until cooked through and golden. Transfer chicken to a clean plate.",
+        "In the same skillet, add the broccoli pieces along with 2 tablespoons of water. Cover for 2 minutes to steam-cook until crisp-tender and vibrant green.",
+        "Push the broccoli to the perimeter of the skillet. Add a dash of olive oil to the center, pour in the beaten eggs, and gently scramble for about 1 minute until softly set.",
+        "Turn the heat to high, fold in the cooked rice and reserved chicken, and stir-fry continuously for 2 to 3 minutes to coat everything evenly and crisp the rice.",
+        "Toss in the diced fresh tomato for the final 30 seconds for a burst of acidity, adjust seasoning with salt, pepper, or soy sauce, and serve immediately."
+      ],
+      "waste_reduction_notes": "Prioritizes the eggs, which have the earliest expiry date in your inventory. Utilizes both the broccoli florets and edible stems to prevent vegetable scrap waste, and incorporates fresh tomato for balanced acidity without needing extra bottled condiments."
+    },
+    "evaluation": {
+      "outcome": "FLAGGED",
+      "status_code": "MISSING_SOME_INGREDIENTS",
+      "status_message": "Recipe approved with caution (56% match). Missing items: 1 pc Broccoli (florets and tender stem diced), Water (for cooking rice), Salt and black pepper, Soy sauce (optional).",
+      "match_ratio": 0.56,
+      "match_percentage": 56,
+      "matched_ingredients": [
+        "200 g Rice",
+        "2 pcs Chicken breast (diced)",
+        "2 Eggs (beaten)",
+        "2 tbsp Olive Oil",
+        "1 pc Tomato (diced)"
+      ],
+      "missing_ingredients": [
+        "1 pc Broccoli (florets and tender stem diced)",
+        "Water (for cooking rice)",
+        "Salt and black pepper",
+        "Soy sauce (optional)"
+      ],
+      "mandatory_met": true,
+      "missing_mandatory": [],
+      "expiry_priority_score": 55.0,
+      "rescued_items": [
+        {
+          "name": "Eggs",
+          "days_until_expiry": -12,
+          "quantity": 5.0,
+          "unit": "pack"
+        }
+      ],
+      "waste_diverted_grams": 500,
+      "is_within_time": true,
+      "allergen_safe": true
+    },
+    "created_at": "2026-09-22 08:09:42"
+  },
+  {
+    "recipe": {
+      "recipe_name": "Healthy Chicken, Broccoli and Egg Stir-Fry Rice Bowl",
+      "meal_type": "Dinner",
+      "estimated_cook_time_mins": 25,
+      "required_tools": [
+        "Chef Knife",
+        "Cutting Board",
+        "Large Skillet or Wok",
+        "Pot with Lid",
+        "Spatula"
+      ],
+      "ingredients_used": [
+        "Chicken breast",
+        "rice",
+        "brocoli",
+        "Eggs",
+        "Tomatoes",
+        "Olive Oil"
+      ],
+      "missing_ingredients": [
+        "Salt",
+        "Black Pepper"
+      ],
+      "instructions": [
+        "Rinse 1 cup of rice and bring to a boil with 2 cups of water in a pot. Cover, lower heat to simmer, and cook for 15 minutes until tender.",
+        "Dice chicken breast into bite-sized pieces, chop broccoli into small florets, and finely dice 1 tomato.",
+        "Heat 1 tablespoon of olive oil in a large skillet over medium-high heat. Add the chicken breast and cook for 5-6 minutes until browned and cooked through.",
+        "Add the broccoli florets and diced tomatoes with a tablespoon of water to the skillet. Cover and steam for 3 minutes until broccoli is vibrant green and tender.",
+        "Push the chicken and vegetables to one side of the pan. Crack 2 eggs onto the empty side and scramble gently until fully cooked.",
+        "Combine all ingredients in the pan, season with salt and pepper, and serve warm over a modest portion of fluffy cooked rice for a low-calorie, high-protein meal."
+      ],
+      "waste_reduction_notes": "This meal prioritizing high-protein and low-calorie objectives uses eggs (which are closest to expiration) alongside mandatory chicken and rice. Incorporating fresh broccoli and tomatoes maximizes usage of fresh produce before spoiling."
+    },
+    "evaluation": {
+      "outcome": "FLAGGED",
+      "status_code": "MISSING_SOME_INGREDIENTS",
+      "status_message": "Recipe approved with caution (86% match). Missing items: Salt, Black Pepper.",
+      "match_ratio": 0.86,
+      "match_percentage": 86,
+      "matched_ingredients": [
+        "Chicken breast",
+        "rice",
+        "brocoli",
+        "Eggs",
+        "Tomatoes",
+        "Olive Oil"
+      ],
+      "missing_ingredients": [
+        "Salt",
+        "Black Pepper"
+      ],
+      "mandatory_met": true,
+      "missing_mandatory": [],
+      "expiry_priority_score": 90.0,
+      "rescued_items": [
+        {
+          "name": "Eggs",
+          "days_until_expiry": -12,
+          "quantity": 5.0,
+          "unit": "pack"
+        },
+        {
+          "name": "Tomatoes",
+          "days_until_expiry": 1,
+          "quantity": 3,
+          "unit": "pcs"
+        }
+      ],
+      "waste_diverted_grams": 800,
+      "is_within_time": true,
+      "allergen_safe": true
+    },
+    "created_at": "2026-09-22 08:12:43"
   }
 ]
