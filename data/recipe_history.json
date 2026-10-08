@@ -469,5 +469,81 @@
       "allergen_safe": true
     },
     "created_at": "2026-09-22 09:17:40"
+  },
+  {
+    "recipe": {
+      "recipe_name": "Chicken, Broccoli, and Egg Fried Rice",
+      "meal_type": "Lunch",
+      "estimated_cook_time_mins": 25,
+      "required_tools": [
+        "Wok or Large Skillet",
+        "Chef Knife",
+        "Cutting Board",
+        "Spatula",
+        "Medium Pot"
+      ],
+      "ingredients_used": [
+        "Eggs (2 pcs)",
+        "Chicken breast (1 pc)",
+        "Broccoli (1 pc)",
+        "Tomatoes (1 pc)",
+        "rice (200 g)",
+        "Olive Oil (2 tbsp)"
+      ],
+      "missing_ingredients": [
+        "Salt",
+        "Soy Sauce"
+      ],
+      "instructions": [
+        "Rinse rice and boil in a medium pot with water for about 12-15 minutes until tender, then drain and set aside to cool slightly.",
+        "Dice chicken breast into bite-sized cubes, chop broccoli into small florets, and dice the tomato.",
+        "Heat 1 tablespoon of olive oil in a large skillet or wok over high heat. Add diced chicken and stir-fry for 5-6 minutes until browned and cooked through. Remove chicken from the pan.",
+        "Add remaining tablespoon of olive oil to the pan. Add broccoli florets and diced tomatoes, stir-frying for 3-4 minutes until tender-crisp.",
+        "Push the vegetables to one side of the pan. Crack the eggs directly into the open space and scramble gently with a spatula until cooked.",
+        "Add the cooked rice and chicken back into the pan with the vegetables and scrambled eggs.",
+        "Stir-fry everything together on high heat for 2-3 minutes, seasoning with salt and soy sauce to taste before serving hot."
+      ],
+      "waste_reduction_notes": "This recipe utilizes Eggs, which are the closest item to expiration, alongside tomatoes, broccoli, and chicken breast, maximizing usage of perishable fridge inventory while fulfilling the stir-fry preference."
+    },
+    "evaluation": {
+      "outcome": "FLAGGED",
+      "status_code": "MISSING_SOME_INGREDIENTS",
+      "status_message": "Recipe approved with caution (71% match). Missing items: Broccoli (1 pc), Salt, Soy Sauce.",
+      "match_ratio": 0.71,
+      "match_percentage": 71,
+      "matched_ingredients": [
+        "Eggs (2 pcs)",
+        "Chicken breast (1 pc)",
+        "Tomatoes (1 pc)",
+        "rice (200 g)",
+        "Olive Oil (2 tbsp)"
+      ],
+      "missing_ingredients": [
+        "Broccoli (1 pc)",
+        "Salt",
+        "Soy Sauce"
+      ],
+      "mandatory_met": true,
+      "missing_mandatory": [],
+      "expiry_priority_score": 95.0,
+      "rescued_items": [
+        {
+          "name": "Eggs",
+          "days_until_expiry": -28,
+          "quantity": 5.0,
+          "unit": "pack"
+        },
+        {
+          "name": "Tomatoes",
+          "days_until_expiry": -15,
+          "quantity": 3,
+          "unit": "pcs"
+        }
+      ],
+      "waste_diverted_grams": 800,
+      "is_within_time": true,
+      "allergen_safe": true
+    },
+    "created_at": "2026-10-08 07:10:34"
   }
 ]
