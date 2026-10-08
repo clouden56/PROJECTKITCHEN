@@ -6,7 +6,6 @@ Constraints: 100% procedural (NO classes), NO print() statements.
 """
 
 from datetime import datetime, date
-from typing import Any
 
 # Allergen synonym dictionary for enhanced safety checks
 ALLERGEN_MAP = {
@@ -178,11 +177,15 @@ def calculate_ingredient_match_ratio(recipe: dict, inventory: list[dict]) -> tup
             missing.append(item_name)
 
     # Process explicit missing ingredients from AI
+    staple_words = set()
+    for staple in COMMON_PANTRY_STAPLES:
+        staple_words |= normalize_ingredient_words(staple)
+
     critical_missing = []
     for m in recipe_missing:
         m_words = normalize_ingredient_words(m)
-        # If it's just a common seasoning staple (salt, pepper, water), classify softly
-        if any(staple in m.lower() for staple in COMMON_PANTRY_STAPLES) and not (m_words - {"salt", "pepper", "oil", "water", "butter"}):
+        # Items made only of staple words (salt, black pepper, cooking oil) don't count against the ratio
+        if m_words and m_words <= staple_words:
             continue
         critical_missing.append(m)
 
