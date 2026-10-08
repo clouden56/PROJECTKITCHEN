@@ -2,7 +2,8 @@
 Logic Manager Module
 Responsibility: Domain brain, business rules, allergen verification, expiry scoring, and multi-condition outcome routing.
 Architecture Layer: Logic Layer
-Constraints: 100% procedural (NO classes), NO print() statements.
+Framework functions: evaluate(record), score(record), route(evaluation).
+Constraints: 100% procedural (no classes), no terminal I/O.
 """
 
 from datetime import datetime, date
@@ -74,45 +75,52 @@ def evaluate_allergen_safety(recipe: dict, user_allergies: list[str]) -> tuple[b
     return is_safe, unique_detected
 
 
-def calculate_expiry_priority_score(recipe: dict, inventory: list[dict]) -> tuple[float, list[dict]]:
+def find_used_inventory_items(recipe: dict, inventory: list[dict]) -> list[dict]:
     """
-    Computes a score (0 to 100) reflecting how effectively the recipe
-    consumes ingredients close to expiration (<= 3 days).
-    Returns (score, list_of_rescued_inventory_items).
+    Returns the inventory items the AI recipe uses, each with its days until expiry.
     """
     used_names = [str(name).strip().lower() for name in recipe.get("ingredients_used", [])]
-    rescued_items = []
-    raw_points = 0
-
+    used_items = []
     for inv_item in inventory:
         inv_name = inv_item.get("name", "").strip().lower()
-        if any(inv_name in u or u in inv_name for u in used_names):
-            days = calculate_days_until_expiry(inv_item.get("expiry_date", ""))
-            item_record = {
+        if inv_name and any(inv_name in u or u in inv_name for u in used_names):
+            used_items.append({
                 "name": inv_item.get("name"),
-                "days_until_expiry": days,
+                "days_until_expiry": calculate_days_until_expiry(inv_item.get("expiry_date", "")),
                 "quantity": inv_item.get("quantity"),
                 "unit": inv_item.get("unit")
-            }
+            })
+    return used_items
 
-            if days <= 0:
-                # Expired or expires today
-                raw_points += 40
-                rescued_items.append(item_record)
-            elif days <= 3:
-                # Critical rescue (1-3 days remaining)
-                raw_points += 30
-                rescued_items.append(item_record)
-            elif days <= 7:
-                # Moderate urgency (4-7 days remaining)
-                raw_points += 15
-                rescued_items.append(item_record)
-            else:
-                raw_points += 5
 
-    # Cap score at 100
-    normalized_score = min(100.0, float(raw_points))
-    return normalized_score, rescued_items
+def expiry_points(days_until_expiry: int) -> int:
+    """
+    Urgency weight of one used ingredient: expired/today 40, 1-3 days 30, 4-7 days 15, otherwise 5.
+    """
+    if days_until_expiry <= 0:
+        return 40
+    if days_until_expiry <= 3:
+        return 30
+    if days_until_expiry <= 7:
+        return 15
+    return 5
+
+
+def score(record: dict) -> float:
+    """
+    Expiry-priority score (0-100) of an AI-enriched record: how strongly the AI's recipe
+    (record["recipe"]["ingredients_used"]) consumes inventory that is close to expiry.
+    Used to rank recipes by food-waste impact.
+    """
+    used_items = find_used_inventory_items(record.get("recipe", {}), record.get("inventory", []))
+    return min(100.0, float(sum(expiry_points(i["days_until_expiry"]) for i in used_items)))
+
+
+def find_rescued_items(recipe: dict, inventory: list[dict]) -> list[dict]:
+    """
+    Used inventory items expiring within 7 days (the ones this recipe rescues from waste).
+    """
+    return [i for i in find_used_inventory_items(recipe, inventory) if i["days_until_expiry"] <= 7]
 
 
 COMMON_PANTRY_STAPLES = {"salt", "pepper", "black pepper", "water", "cooking oil", "oil", "butter"}
@@ -252,91 +260,94 @@ def check_mandatory_ingredients(recipe: dict, mandatory_ingredients: list[str]) 
     return len(missing) == 0, missing
 
 
-def evaluate_recipe(
-    recipe: dict,
-    inventory: list[dict],
-    max_cook_time_mins: int,
-    user_allergies: list[str],
-    min_match_ratio: float = 0.50,
-    mandatory_ingredients: list[str] = None
-) -> dict:
+def route(evaluation: dict) -> dict:
     """
-    Core Domain Rule: Multi-condition evaluation pipeline acting on AI output.
-    Applies business logic combining allergen safety, time constraints, match threshold,
-    mandatory ingredients fulfillment, and expiry score to route into an outcome:
-    ACCEPTED, FLAGGED, or REJECTED.
+    Assigns an evaluated record to an outcome path. Multi-condition rule over AI response fields
+    (ingredients_used, missing_ingredients, estimated_cook_time_mins) and the user's constraints;
+    checked in order, first match wins.
+    Returns {"outcome": ACCEPTED|FLAGGED|REJECTED, "status_code": str, "status_message": str}.
     """
-    # 1. Evaluate Allergen Safety
-    is_safe, allergen_violations = evaluate_allergen_safety(recipe, user_allergies)
+    ratio_pct = int(evaluation["match_ratio"] * 100)
+    min_pct = int(evaluation["min_match_ratio"] * 100)
 
-    # 2. Match Ratio Calculation
+    if not evaluation["allergen_safe"]:
+        return {
+            "outcome": "REJECTED",
+            "status_code": "ALLERGEN_CONTAMINATION",
+            "status_message": f"Recipe rejected due to detected allergens: {', '.join(evaluation['allergen_violations'])}."
+        }
+    if evaluation["match_ratio"] < evaluation["min_match_ratio"]:
+        return {
+            "outcome": "REJECTED",
+            "status_code": "INSUFFICIENT_INGREDIENTS",
+            "status_message": f"Ingredient match ratio ({ratio_pct}%) is below the minimum threshold of {min_pct}%."
+        }
+    if not evaluation["mandatory_met"]:
+        return {
+            "outcome": "FLAGGED",
+            "status_code": "MISSING_MANDATORY_INGREDIENT",
+            "status_message": (
+                "Recipe generated but missing your requested mandatory ingredient(s): "
+                f"{', '.join(evaluation['missing_mandatory'])}."
+            )
+        }
+    if not evaluation["is_within_time"]:
+        return {
+            "outcome": "FLAGGED",
+            "status_code": "EXCEEDS_TIME_LIMIT",
+            "status_message": (
+                f"Recipe cook time ({evaluation['cook_time_mins']} mins) exceeds your limit of "
+                f"{evaluation['max_cook_time_mins']} mins, but has a good ingredient match ({ratio_pct}%)."
+            )
+        }
+    if evaluation["missing_ingredients"]:
+        return {
+            "outcome": "FLAGGED",
+            "status_code": "MISSING_SOME_INGREDIENTS",
+            "status_message": (
+                f"Recipe approved with caution ({ratio_pct}% match). "
+                f"Missing items: {', '.join(evaluation['missing_ingredients'])}."
+            )
+        }
+    return {
+        "outcome": "ACCEPTED",
+        "status_code": "OPTIMAL_MATCH",
+        "status_message": "Recipe perfectly matches your fridge ingredients and cooking parameters!"
+    }
+
+
+def evaluate(record: dict, min_match_ratio: float = 0.50) -> dict:
+    """
+    Runs every business rule against an AI-enriched record and returns the decision dict.
+    record keys: recipe (validated AI output), inventory, max_cook_time_mins, allergies,
+                 mandatory_ingredients (optional)
+    """
+    recipe = record.get("recipe", {})
+    inventory = record.get("inventory", [])
+    max_cook_time_mins = record.get("max_cook_time_mins", 0)
+
+    is_safe, allergen_violations = evaluate_allergen_safety(recipe, record.get("allergies", []))
     match_ratio, matched_ings, missing_ings = calculate_ingredient_match_ratio(recipe, inventory)
-
-    # 3. Mandatory Ingredients Verification
-    mandatory_met, missing_mandatory = check_mandatory_ingredients(recipe, mandatory_ingredients or [])
-
-    # 4. Expiry Priority Score & Rescued Items
-    expiry_score, rescued_items = calculate_expiry_priority_score(recipe, inventory)
-
-    # 5. Cook Time Constraint Check
+    mandatory_met, missing_mandatory = check_mandatory_ingredients(recipe, record.get("mandatory_ingredients") or [])
+    rescued_items = find_rescued_items(recipe, inventory)
     cook_time = recipe.get("estimated_cook_time_mins", 0)
-    is_within_time = cook_time <= max_cook_time_mins
 
-    # 6. Waste Impact
-    waste_diverted_grams = estimate_food_waste_diverted(rescued_items)
-
-    # --- Multi-Condition Decision Routing ---
-    if not is_safe:
-        outcome = "REJECTED"
-        status_code = "ALLERGEN_CONTAMINATION"
-        status_message = f"Recipe rejected due to detected allergens: {', '.join(allergen_violations)}."
-    elif match_ratio < min_match_ratio:
-        outcome = "REJECTED"
-        status_code = "INSUFFICIENT_INGREDIENTS"
-        status_message = (
-            f"Ingredient match ratio ({int(match_ratio * 100)}%) is below the "
-            f"minimum threshold of {int(min_match_ratio * 100)}%."
-        )
-    elif not mandatory_met:
-        outcome = "FLAGGED"
-        status_code = "MISSING_MANDATORY_INGREDIENT"
-        status_message = (
-            f"Recipe generated but missing your requested mandatory ingredient(s): {', '.join(missing_mandatory)}."
-        )
-    elif not is_within_time and match_ratio >= min_match_ratio:
-        outcome = "FLAGGED"
-        status_code = "EXCEEDS_TIME_LIMIT"
-        status_message = (
-            f"Recipe cook time ({cook_time} mins) exceeds your limit of {max_cook_time_mins} mins, "
-            f"but has a good ingredient match ({int(match_ratio * 100)}%)."
-        )
-    elif missing_ings and match_ratio >= min_match_ratio:
-        outcome = "FLAGGED"
-        status_code = "MISSING_SOME_INGREDIENTS"
-        status_message = (
-            f"Recipe approved with caution ({int(match_ratio * 100)}% match). "
-            f"Missing items: {', '.join(missing_ings)}."
-        )
-    else:
-        outcome = "ACCEPTED"
-        status_code = "OPTIMAL_MATCH"
-        status_message = "Recipe perfectly matches your fridge ingredients and cooking parameters!"
-
-    evaluation_record = {
-        "outcome": outcome,
-        "status_code": status_code,
-        "status_message": status_message,
+    evaluation = {
+        "allergen_safe": is_safe,
+        "allergen_violations": allergen_violations,
         "match_ratio": match_ratio,
+        "min_match_ratio": min_match_ratio,
         "match_percentage": int(match_ratio * 100),
         "matched_ingredients": matched_ings,
         "missing_ingredients": missing_ings,
         "mandatory_met": mandatory_met,
         "missing_mandatory": missing_mandatory,
-        "expiry_priority_score": expiry_score,
+        "cook_time_mins": cook_time,
+        "max_cook_time_mins": max_cook_time_mins,
+        "is_within_time": cook_time <= max_cook_time_mins,
+        "expiry_priority_score": score(record),
         "rescued_items": rescued_items,
-        "waste_diverted_grams": waste_diverted_grams,
-        "is_within_time": is_within_time,
-        "allergen_safe": is_safe
+        "waste_diverted_grams": estimate_food_waste_diverted(rescued_items),
     }
-
-    return evaluation_record
+    evaluation.update(route(evaluation))
+    return evaluation
