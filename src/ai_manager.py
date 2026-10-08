@@ -7,6 +7,8 @@ Constraints: 100% procedural (NO classes), NO print() statements, ZERO domain lo
 
 import os
 import json
+import math
+import time
 import urllib.request
 import urllib.error
 import logging
@@ -124,7 +126,7 @@ def call_gemini_api(
         logger.error(msg)
         return False, None, msg
 
-    endpoint = f"{API_BASE_URL}/{model}:generateContent?key={api_key}"
+    endpoint = f"{API_BASE_URL}/{model}:generateContent"
 
     payload = {
         "contents": [{
@@ -141,13 +143,15 @@ def call_gemini_api(
         req = urllib.request.Request(
             endpoint,
             data=data_bytes,
-            headers={"Content-Type": "application/json"},
+            headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
             method="POST"
         )
 
         with urllib.request.urlopen(req, timeout=timeout_seconds) as response:
             body = response.read().decode("utf-8")
             response_json = json.loads(body)
+            if not isinstance(response_json, dict):
+                return False, None, "Malformed API response: top-level JSON is not an object."
             return True, response_json, ""
 
     except urllib.error.HTTPError as err:
@@ -157,6 +161,10 @@ def call_gemini_api(
         return False, None, msg
     except urllib.error.URLError as err:
         msg = f"Network connection error: {err.reason}"
+        logger.error(msg)
+        return False, None, msg
+    except TimeoutError:
+        msg = f"Network timeout: no response from API within {timeout_seconds} seconds."
         logger.error(msg)
         return False, None, msg
     except json.JSONDecodeError as err:
@@ -192,8 +200,12 @@ def validate_recipe_schema(recipe_data: Any) -> tuple[bool, dict, str]:
     for key, expected_type in required_keys.items():
         if key not in recipe_data:
             return False, {}, f"Missing required schema field: '{key}'"
-        if not isinstance(recipe_data[key], expected_type):
+        if not isinstance(recipe_data[key], expected_type) or isinstance(recipe_data[key], bool):
             return False, {}, f"Field '{key}' has invalid type {type(recipe_data[key])}, expected {expected_type}"
+
+    cook_time = recipe_data["estimated_cook_time_mins"]
+    if not math.isfinite(cook_time) or cook_time < 0:
+        return False, {}, f"Field 'estimated_cook_time_mins' must be a non-negative finite number, got {cook_time}"
 
     # Clean and cast fields
     cleaned_tools = [str(t).strip() for t in recipe_data.get("required_tools", []) if str(t).strip()]
@@ -221,6 +233,32 @@ def validate_recipe_schema(recipe_data: Any) -> tuple[bool, dict, str]:
     return True, cleaned, ""
 
 
+def strip_markdown_fences(text: str) -> str:
+    """
+    Removes a surrounding ```json ... ``` fence that some fallback models add despite instructions.
+    """
+    stripped = text.strip()
+    if stripped.startswith("```") and stripped.endswith("```"):
+        stripped = stripped[3:-3].strip()
+        if stripped.lower().startswith("json"):
+            stripped = stripped[4:].strip()
+    return stripped
+
+
+def classify_api_error(error_message: str) -> str:
+    """
+    Decides the retry policy for a failed API call:
+    'abort'      - authentication/permission problems; no model can succeed (401, 403, missing key)
+    'next_model' - request or model rejected (400, 404); retrying the same model is pointless
+    'retry'      - transient failures (network, timeout, 429, 5xx); back off and try again
+    """
+    if error_message.startswith(("HTTP Error 401", "HTTP Error 403")) or "API_KEY_INVALID" in error_message:
+        return "abort"
+    if error_message.startswith(("HTTP Error 400", "HTTP Error 404")):
+        return "next_model"
+    return "retry"
+
+
 def extract_recipe_json(gemini_response: dict) -> tuple[bool, dict, str]:
     """
     Extracts the structured JSON payload from Gemini generateContent response candidate.
@@ -238,11 +276,10 @@ def extract_recipe_json(gemini_response: dict) -> tuple[bool, dict, str]:
         if not text_content:
             return False, {}, "Candidate returned empty text."
 
-        # Parse the JSON string
-        parsed = json.loads(text_content)
+        parsed = json.loads(strip_markdown_fences(text_content))
         return validate_recipe_schema(parsed)
 
-    except (KeyError, IndexError, json.JSONDecodeError) as err:
+    except (KeyError, IndexError, AttributeError, TypeError, json.JSONDecodeError) as err:
         msg = f"Failed to extract structured recipe JSON: {err}"
         logger.error(msg)
         return False, {}, msg
@@ -268,7 +305,6 @@ def request_recipe_from_ai(
     4. Handles errors gracefully without crashing
     Returns: (success: bool, recipe_dict: dict, error_or_status_message: str)
     """
-    import time
     api_key = get_api_key()
     if not api_key:
         return False, {}, "Gemini API key is not configured. Please set GEMINI_API_KEY."
@@ -293,11 +329,17 @@ def request_recipe_from_ai(
                 if valid:
                     return True, validated_recipe, "Recipe generated and schema validated successfully."
                 last_error = f"Schema validation error on {target_model}: {val_err}"
-            else:
-                last_error = f"API error on {target_model}: {err}"
-                # If rate-limited or busy, brief backoff
-                if "503" in err or "429" in err:
-                    time.sleep(1.5)
+                continue
+
+            last_error = f"API error on {target_model}: {err}"
+            policy = classify_api_error(err)
+            if policy == "abort":
+                logger.error("Non-recoverable API error, aborting: %s", err)
+                return False, {}, f"AI request rejected (check your GEMINI_API_KEY): {err}"
+            if policy == "next_model":
+                break
+            if attempt == 0:
+                time.sleep(1.5)
 
     logger.error("All AI model attempts exhausted. Last error: %s", last_error)
     return False, {}, f"AI API service temporarily unavailable: {last_error}"
