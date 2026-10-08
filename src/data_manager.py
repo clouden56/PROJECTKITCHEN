@@ -2,17 +2,22 @@
 Data Manager Module
 Responsibility: Flat-file persistence, loading, saving, querying, and error recovery.
 Architecture Layer: Data Layer
-Constraints: 100% procedural (NO classes), NO print() statements.
+Framework functions: save(record), load(), query(filter_fn) for evaluated recipe records;
+load_inventory/save_inventory for the inventory the requests are built from.
+Constraints: 100% procedural (no classes), no terminal I/O.
 """
 
 import os
 import json
 import logging
 from datetime import datetime
-from typing import Any
+from typing import Any, Callable
 
 # Configure logger for headless error tracking
 logger = logging.getLogger("data_manager")
+
+INVENTORY_FILE = "data/inventory.json"
+HISTORY_FILE = "data/recipe_history.json"
 
 
 def load_json_data(file_path: str, default_data: Any) -> Any:
@@ -95,7 +100,7 @@ def save_json_data(file_path: str, data: Any) -> bool:
         return False
 
 
-def load_inventory(file_path: str = "data/inventory.json") -> list[dict]:
+def load_inventory(file_path: str = INVENTORY_FILE) -> list[dict]:
     """
     Loads fridge and pantry inventory records from disk.
     Non-list files and non-dict records are discarded so downstream layers can rely on the shape.
@@ -107,7 +112,7 @@ def load_inventory(file_path: str = "data/inventory.json") -> list[dict]:
     return []
 
 
-def save_inventory(inventory: list[dict], file_path: str = "data/inventory.json") -> bool:
+def save_inventory(inventory: list[dict], file_path: str = INVENTORY_FILE) -> bool:
     """
     Persists inventory records to disk.
     """
@@ -154,10 +159,10 @@ def remove_inventory_item(inventory: list[dict], item_name: str) -> tuple[list[d
     return updated, was_removed
 
 
-def load_recipe_history(file_path: str = "data/recipe_history.json") -> list[dict]:
+def load(file_path: str = HISTORY_FILE) -> list[dict]:
     """
-    Loads saved recipe records from disk.
-    Non-list files and non-dict records are discarded so downstream layers can rely on the shape.
+    Reads and returns every saved (AI-processed, evaluated) recipe record.
+    Returns an empty list if the file is missing, empty or corrupt; never raises.
     """
     data = load_json_data(file_path, default_data=[])
     if isinstance(data, list):
@@ -166,13 +171,52 @@ def load_recipe_history(file_path: str = "data/recipe_history.json") -> list[dic
     return []
 
 
-def save_recipe_to_history(recipe_record: dict, file_path: str = "data/recipe_history.json") -> bool:
+def save(record: dict, file_path: str = HISTORY_FILE) -> bool:
     """
-    Appends an evaluated recipe record to persistent history.
+    Appends one record to the history file after logic_manager has evaluated it.
+    Returns True on success, False if the write failed.
     """
-    history = load_recipe_history(file_path)
-    history.append(recipe_record)
+    history = load(file_path)
+    history.append(record)
     return save_json_data(file_path, history)
+
+
+def query(filter_fn: Callable[[dict], bool], file_path: str = HISTORY_FILE) -> list[dict]:
+    """
+    Returns the saved records for which filter_fn(record) is truthy. A record that makes the
+    filter raise (e.g. a hand-edited row missing a field) is skipped and logged, not fatal.
+    """
+    matches = []
+    for record in load(file_path):
+        try:
+            if filter_fn(record):
+                matches.append(record)
+        except (KeyError, TypeError, AttributeError, ValueError) as err:
+            logger.warning("Skipping record that filter could not evaluate: %s", err)
+    return matches
+
+
+def recipe_of(record: dict) -> dict:
+    """
+    The recipe part of a history record (supports nested {"recipe": {...}} and flat recipe dicts).
+    """
+    return record["recipe"] if isinstance(record.get("recipe"), dict) else record
+
+
+def meal_type_filter(meal_type: str) -> Callable[[dict], bool]:
+    """
+    Builds a query() filter matching records of the given meal type (case-insensitive).
+    """
+    target = meal_type.strip().lower()
+    return lambda record: str(recipe_of(record).get("meal_type", "")).strip().lower() == target
+
+
+def ingredient_filter(ingredient: str) -> Callable[[dict], bool]:
+    """
+    Builds a query() filter matching records whose recipe uses the given ingredient (substring).
+    """
+    needle = ingredient.strip().lower()
+    return lambda record: any(needle in str(ing).lower() for ing in recipe_of(record).get("ingredients_used", []))
 
 
 def query_items_by_expiry(inventory: list[dict], max_days: int) -> list[dict]:
@@ -197,36 +241,6 @@ def query_items_by_expiry(inventory: list[dict], max_days: int) -> list[dict]:
 
     expiring_items.sort(key=lambda x: x.get("days_left", 999))
     return expiring_items
-
-
-def filter_recipes_by_meal_type(history: list[dict], meal_type: str) -> list[dict]:
-    """
-    Filters saved recipes by meal type (e.g., Breakfast, Lunch, Dinner, Snack).
-    Supports both nested record structure and flat recipe dicts.
-    """
-    target = meal_type.strip().lower()
-    results = []
-    for r in history:
-        recipe_data = r.get("recipe", r) if isinstance(r.get("recipe"), dict) else r
-        val = recipe_data.get("meal_type", "").strip().lower()
-        if val == target:
-            results.append(r)
-    return results
-
-
-def search_recipes_by_ingredient(history: list[dict], ingredient_query: str) -> list[dict]:
-    """
-    Searches saved recipes for those containing the given ingredient.
-    Supports both nested record structure and flat recipe dicts.
-    """
-    query = ingredient_query.strip().lower()
-    results = []
-    for r in history:
-        recipe_data = r.get("recipe", r) if isinstance(r.get("recipe"), dict) else r
-        used = [str(ing).lower() for ing in recipe_data.get("ingredients_used", [])]
-        if any(query in ing for ing in used):
-            results.append(r)
-    return results
 
 
 def query_items_by_storage(inventory: list[dict], storage_type: str) -> list[dict]:
