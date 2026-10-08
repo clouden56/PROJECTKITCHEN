@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fridge Recipe Tracker — Engineering Report</title>
+<style>
+  @page {
+    size: A4;
+    margin: 11mm 13mm 12mm 13mm;
+    @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 8pt "Segoe UI", sans-serif; color: #777; }
+    @bottom-left { content: "Fridge Recipe Tracker · Engineering Report · Team Project Part 1"; font: 8pt "Segoe UI", sans-serif; color: #777; }
+  }
+  :root {
+    --ink: #1d2433; --muted: #5b6474; --rule: #d5dae2; --accent: #1f5f8b;
+    --io: #2f6fb5; --ai: #7a4cc2; --logic: #2e8a57; --data: #c07a16; --ext: #6b7280;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Calibri, Arial, sans-serif; font-size: 9.3pt; line-height: 1.36; color: var(--ink); margin: 0; background: #fff; }
+  h1 { font-size: 19pt; margin: 0 0 2px; color: var(--accent); letter-spacing: -0.2px; }
+  h2 { font-size: 12.2pt; margin: 12px 0 5px; color: var(--accent); border-bottom: 1.5px solid var(--accent); padding-bottom: 2px; }
+  h3 { font-size: 10.2pt; margin: 9px 0 3px; }
+  p { margin: 0 0 6px; }
+  ul { margin: 0 0 6px; padding-left: 17px; }
+  li { margin-bottom: 2px; }
+  code, .mono { font-family: Consolas, "Cascadia Mono", monospace; font-size: 8.6pt; }
+  .subtitle { color: var(--muted); font-size: 10.5pt; margin-bottom: 8px; }
+  .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 18px; border: 1px solid var(--rule); border-radius: 6px; padding: 7px 10px; margin-bottom: 8px; font-size: 9pt; }
+  .meta b { color: var(--muted); font-weight: 600; }
+  .placeholder { background: #fff3c4; padding: 0 3px; border-radius: 2px; }
+  table { width: 100%; border-collapse: collapse; margin: 4px 0 8px; }
+  th, td { border: 1px solid var(--rule); padding: 3px 5px; vertical-align: top; text-align: left; }
+  th { background: #eef2f7; font-weight: 600; }
+  .tight td, .tight th { font-size: 8.3pt; padding: 2.5px 4px; line-height: 1.28; }
+  .matrix td, .matrix th { font-size: 7.8pt; padding: 1.6px 4px; line-height: 1.2; }
+  .matrix code { font-size: 7.4pt; }
+  .matrix .cat td { background: #e7edf5; font-weight: 700; color: var(--accent); font-size: 8.2pt; text-align: left; }
+  .matrix .user { color: #1f5f8b; }
+  .matrix td:first-child { text-align: center; color: var(--muted); width: 18px; }
+  .ex { font-family: Consolas, monospace; font-size: 7.6pt; color: #333; word-break: break-word; }
+  figure { margin: 4px 0 8px; }
+  figcaption { font-size: 8.4pt; color: var(--muted); margin-top: 3px; }
+  svg text { font-family: "Segoe UI", Calibri, Arial, sans-serif; }
+  .page-break { break-before: page; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .pill { display: inline-block; padding: 0 5px; border-radius: 3px; font-size: 7.8pt; font-weight: 700; color: #fff; }
+  .ok { background: #2e8a57; } .flag { background: #c07a16; } .rej { background: #b23b3b; }
+  .callout { border-left: 3px solid var(--accent); background: #f4f7fb; padding: 5px 9px; margin: 6px 0 8px; font-size: 9pt; }
+  .small { font-size: 8.4pt; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<!-- ============================ PAGE 1 ============================ -->
+<h1>Fridge Recipe Tracker — Engineering Report</h1>
+<div class="subtitle">Team Project Part 1 · Programming Fundamentals · AI-assisted, food-waste-aware recipe planner (procedural Python CLI)</div>
+
+<div class="meta">
+  <div><b>Lab group:</b> <span class="placeholder">[LabGroup]</span> &nbsp; <b>Team:</b> <span class="placeholder">[TeamNumber]</span></div>
+  <div><b>Submission:</b> 14 October 2026</div>
+  <div><b>Members:</b> <span class="placeholder">[Name (Student ID), Name (Student ID), …]</span></div>
+  <div><b>Repository:</b> <span class="mono">github.com/clouden56/PROJECTKITCHEN</span></div>
+</div>
+
+<h2>1. Problem and Objectives</h2>
+<p>Households routinely discard food that was simply forgotten until it expired, then spend more on groceries or takeaway, and face daily "what can I cook?" decision fatigue. <b>Fridge Recipe Tracker</b> is a command-line kitchen assistant that records fridge and pantry items with expiry dates and asks Google Gemini for a recipe that uses the most urgent items first. The AI output is never trusted blindly: a deterministic rule engine accepts, flags or rejects every suggestion before it reaches the user.</p>
+<ul>
+  <li><b>Track</b> inventory (name, quantity, unit, location, expiry) in flat JSON files that survive restarts and container rebuilds.</li>
+  <li><b>Generate</b> recipes with AI under the user's meal type, time limit, allergies and must-include ingredients, using a strict JSON response schema.</li>
+  <li><b>Decide</b> with business rules: allergen gate (with a synonym map, e.g. <i>dairy → milk, cheese, butter</i>), ≥ 50 % ingredient-match threshold, cook-time limit, must-include check, and a minimum of two inventory items before calling the API.</li>
+  <li><b>Measure impact</b>: an expiry-priority score (expired/today +40, 1–3 days +30, 4–7 days +15, otherwise +5, capped at 100) and an estimate of grams of food diverted from waste.</li>
+</ul>
+
+<h2>2. Architecture</h2>
+<figure>
+<svg viewBox="0 0 770 150" width="100%" role="img" aria-label="Hub and spoke architecture: main.py calls four independent managers">
+  <defs>
+    <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5b6474"/></marker>
+  </defs>
+  <rect x="235" y="6" width="300" height="40" rx="7" fill="#1f5f8b"/>
+  <text x="385" y="23" text-anchor="middle" fill="#fff" font-size="12.5" font-weight="700">main.py — application coordinator</text>
+  <text x="385" y="38" text-anchor="middle" fill="#dbe7f3" font-size="9.5">menu loop · pipeline orchestration · no print() · no classes</text>
+  <g stroke="#5b6474" stroke-width="1.3" fill="none" marker-end="url(#a1)">
+    <path d="M300,46 L97,92"/><path d="M360,46 L290,92"/><path d="M410,46 L480,92"/><path d="M470,46 L673,92"/>
+  </g>
+  <g font-size="9.5">
+    <rect x="10" y="92" width="175" height="52" rx="6" fill="#eef4fb" stroke="#2f6fb5" stroke-width="1.5"/>
+    <text x="97" y="110" text-anchor="middle" font-weight="700" fill="#2f6fb5" font-size="11">io_manager</text>
+    <text x="97" y="124" text-anchor="middle" fill="#333">Input/Output layer</text>
+    <text x="97" y="137" text-anchor="middle" fill="#5b6474">all print()/input(), re-prompting</text>
+
+    <rect x="200" y="92" width="180" height="52" rx="6" fill="#f5f0fc" stroke="#7a4cc2" stroke-width="1.5"/>
+    <text x="290" y="110" text-anchor="middle" font-weight="700" fill="#7a4cc2" font-size="11">ai_manager</text>
+    <text x="290" y="124" text-anchor="middle" fill="#333">AI processing layer</text>
+    <text x="290" y="137" text-anchor="middle" fill="#5b6474">prompt, REST call, schema check</text>
+
+    <rect x="395" y="92" width="175" height="52" rx="6" fill="#edf7f1" stroke="#2e8a57" stroke-width="1.5"/>
+    <text x="482" y="110" text-anchor="middle" font-weight="700" fill="#2e8a57" font-size="11">logic_manager</text>
+    <text x="482" y="124" text-anchor="middle" fill="#333">Logic layer (domain brain)</text>
+    <text x="482" y="137" text-anchor="middle" fill="#5b6474">allergens, scoring, verdict</text>
+
+    <rect x="585" y="92" width="175" height="52" rx="6" fill="#fdf5ea" stroke="#c07a16" stroke-width="1.5"/>
+    <text x="672" y="110" text-anchor="middle" font-weight="700" fill="#c07a16" font-size="11">data_manager</text>
+    <text x="672" y="124" text-anchor="middle" fill="#333">Data layer</text>
+    <text x="672" y="137" text-anchor="middle" fill="#5b6474">JSON persistence, queries</text>
+  </g>
+</svg>
+<figcaption><b>Figure 1.</b> Hub-and-spoke modular architecture. No manager imports another manager; only <code>main.py</code> composes them, so each layer can be tested and replaced in isolation.</figcaption>
+</figure>
+
+<table class="tight">
+  <tr><th style="width:15%">Module</th><th style="width:38%">Single responsibility</th><th>Key procedural functions (all typed)</th></tr>
+  <tr><td><code>io_manager</code></td><td>Collect and validate every keystroke; render every line of output. The only module allowed to call <code>print()</code>.</td><td class="mono">prompt_menu_choice, prompt_date, prompt_positive_number, prompt_recipe_generation_criteria, display_inventory, display_recipe_card</td></tr>
+  <tr><td><code>ai_manager</code></td><td>Build the prompt, call the Gemini REST API with a model cascade, and validate the JSON schema. Contains no domain rules.</td><td class="mono">build_recipe_prompt, call_gemini_api, classify_api_error, extract_recipe_json, validate_recipe_schema, request_recipe_from_ai</td></tr>
+  <tr><td><code>logic_manager</code></td><td>Apply the business rules to validated AI output and produce a verdict: ACCEPTED, FLAGGED or REJECTED.</td><td class="mono">evaluate_allergen_safety, calculate_ingredient_match_ratio, calculate_expiry_priority_score, check_mandatory_ingredients, evaluate_recipe</td></tr>
+  <tr><td><code>data_manager</code></td><td>Load, save and query flat JSON files; survive missing, corrupt or unwritable files.</td><td class="mono">load_json_data, save_json_data, quarantine_corrupt_file, add_inventory_item, query_items_by_expiry, search_recipes_by_ingredient</td></tr>
+</table>
+
+<div class="callout"><b>Design conventions.</b> The program is 100 % procedural: there are zero <code>class</code> definitions, and an automated test scans every <code>.py</code> file to enforce this. Layers exchange only plain <code>dict</code>/<code>list</code> values. Failures are returned as values (<code>(success, result, error_message)</code> tuples, defaults or <code>False</code>), so an exception never crosses a layer boundary and the menu loop cannot crash. Diagnostics go to <code>data/app.log</code> through <code>logging</code>, keeping the terminal UI clean.</div>
+
+<!-- ============================ PAGE 2 ============================ -->
+<h2 class="page-break">3. Data Flow: User Input → AI Payload → File Storage</h2>
+<p>Figure 2 follows a single "AI Recipe Generator" request (menu option 4) through the system. Each numbered box is a distinct <b>state</b> of the data; each arrow is the function that transforms it. Swimlanes show which layer owns each state.</p>
+<figure>
+<svg viewBox="0 0 770 748" width="100%" role="img" aria-label="Data flow diagram from user keystrokes to Gemini payload to JSON file storage">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3b4252"/></marker>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b23b3b"/></marker>
+  </defs>
+  <!-- swimlanes -->
+  <rect x="0" y="0" width="130" height="748" fill="#f6f6f7"/>
+  <rect x="130" y="0" width="160" height="748" fill="#f3f7fc"/>
+  <rect x="290" y="0" width="160" height="748" fill="#f8f4fd"/>
+  <rect x="450" y="0" width="160" height="748" fill="#f2f9f5"/>
+  <rect x="610" y="0" width="160" height="748" fill="#fdf8f0"/>
+  <g stroke="#d5dae2" stroke-width="1"><line x1="130" y1="0" x2="130" y2="748"/><line x1="290" y1="0" x2="290" y2="748"/><line x1="450" y1="0" x2="450" y2="748"/><line x1="610" y1="0" x2="610" y2="748"/></g>
+  <g font-size="10" font-weight="700" text-anchor="middle">
+    <rect x="0" y="0" width="130" height="26" fill="#e3e4e8"/><text x="65" y="17" fill="#4b5563">External entities</text>
+    <rect x="130" y="0" width="160" height="26" fill="#dbe8f7"/><text x="210" y="17" fill="#2f6fb5">I/O · io_manager</text>
+    <rect x="290" y="0" width="160" height="26" fill="#ebe1f8"/><text x="370" y="17" fill="#7a4cc2">AI · ai_manager</text>
+    <rect x="450" y="0" width="160" height="26" fill="#dcf0e4"/><text x="530" y="17" fill="#2e8a57">Logic · logic_manager</text>
+    <rect x="610" y="0" width="160" height="26" fill="#f8e7cf"/><text x="690" y="17" fill="#c07a16">Data · data_manager</text>
+  </g>
+
+  <!-- arrows (drawn first so boxes sit on top) -->
+  <g stroke="#3b4252" stroke-width="1.4" fill="none" marker-end="url(#ar)">
+    <path d="M120,70 H136"/>
+    <path d="M210,96 V122"/>
+    <path d="M690,96 V122"/>
+    <path d="M282,150 H355 V202"/>
+    <path d="M618,150 H385 V202"/>
+    <path d="M370,256 V282"/>
+    <path d="M298,310 H122"/>
+    <path d="M120,390 H296"/>
+    <path d="M370,416 V442"/>
+    <path d="M442,470 H530 V522"/>
+    <path d="M690,176 V550 H612"/>
+    <path d="M160,176 V550 H456"/>
+    <path d="M500,576 V630 H284"/>
+    <path d="M560,576 V630 H616"/>
+    <path d="M690,656 V682"/>
+    <path d="M138,630 H122"/>
+  </g>
+  <path d="M442,382 H462 V318 H444" stroke="#b23b3b" stroke-width="1.3" stroke-dasharray="4 3" fill="none" marker-end="url(#arr)"/>
+
+  <!-- arrow labels -->
+  <g font-size="8.6" fill="#3b4252">
+    <text x="216" y="113">prompt_*() validation</text>
+    <text x="696" y="113">json.loads</text>
+    <text x="298" y="145">criteria</text>
+    <text x="520" y="145">inventory list</text>
+    <text x="376" y="273">json.dumps + POST</text>
+    <text x="232" y="304" text-anchor="middle">HTTPS, x-goog-api-key</text>
+    <text x="232" y="384" text-anchor="middle">JSON response</text>
+    <text x="376" y="433">extract_recipe_json()</text>
+    <text x="474" y="465">recipe</text>
+    <text x="696" y="360">inventory</text>
+    <text x="696" y="372">(expiry dates)</text>
+    <text x="300" y="545">constraints: time, allergies, must-haves</text>
+    <text x="330" y="625">recipe + evaluation</text>
+    <text x="566" y="604">+ created_at</text>
+    <text x="696" y="673">atomic save</text>
+  </g>
+  <g font-size="8.3" fill="#b23b3b">
+    <text x="466" y="340">invalid / error →</text>
+    <text x="466" y="351">retry or next model</text>
+  </g>
+
+  <!-- external entities -->
+  <g>
+    <rect x="10" y="44" width="110" height="52" rx="3" fill="#e5e7eb" stroke="#6b7280" stroke-width="1.6"/>
+    <text x="65" y="66" text-anchor="middle" font-size="11" font-weight="700" fill="#374151">User</text>
+    <text x="65" y="81" text-anchor="middle" font-size="9" fill="#5b6474">keyboard</text>
+    <rect x="10" y="284" width="110" height="132" rx="3" fill="#e5e7eb" stroke="#6b7280" stroke-width="1.6"/>
+    <text x="65" y="336" text-anchor="middle" font-size="11" font-weight="700" fill="#374151">Google</text>
+    <text x="65" y="350" text-anchor="middle" font-size="11" font-weight="700" fill="#374151">Gemini API</text>
+    <text x="65" y="366" text-anchor="middle" font-size="8.6" fill="#5b6474">3-model cascade</text>
+    <text x="65" y="377" text-anchor="middle" font-size="8.6" fill="#5b6474">2 attempts each</text>
+    <rect x="10" y="604" width="110" height="52" rx="3" fill="#e5e7eb" stroke="#6b7280" stroke-width="1.6"/>
+    <text x="65" y="626" text-anchor="middle" font-size="11" font-weight="700" fill="#374151">User</text>
+    <text x="65" y="641" text-anchor="middle" font-size="9" fill="#5b6474">terminal screen</text>
+  </g>
+
+  <!-- state boxes -->
+  <g font-size="9">
+    <rect x="138" y="44" width="144" height="52" rx="6" fill="#fff" stroke="#2f6fb5" stroke-width="1.5"/>
+    <text x="210" y="66" text-anchor="middle" font-weight="700" font-size="10.5">① Raw keystrokes</text>
+    <text x="210" y="81" text-anchor="middle" fill="#5b6474">str from input()</text>
+
+    <rect x="138" y="124" width="144" height="52" rx="6" fill="#fff" stroke="#2f6fb5" stroke-width="1.5"/>
+    <text x="210" y="146" text-anchor="middle" font-weight="700" font-size="10.5">② Validated criteria</text>
+    <text x="210" y="161" text-anchor="middle" fill="#5b6474">dict (typed, re-prompted)</text>
+
+    <rect x="298" y="204" width="144" height="52" rx="6" fill="#fff" stroke="#7a4cc2" stroke-width="1.5"/>
+    <text x="370" y="226" text-anchor="middle" font-weight="700" font-size="10.5">③ Prompt string</text>
+    <text x="370" y="241" text-anchor="middle" fill="#5b6474">build_recipe_prompt()</text>
+
+    <rect x="298" y="284" width="144" height="52" rx="6" fill="#fff" stroke="#7a4cc2" stroke-width="1.5"/>
+    <text x="370" y="306" text-anchor="middle" font-weight="700" font-size="10.5">④ Request payload</text>
+    <text x="370" y="321" text-anchor="middle" fill="#5b6474">JSON bytes · call_gemini_api()</text>
+
+    <rect x="298" y="364" width="144" height="52" rx="6" fill="#fff" stroke="#7a4cc2" stroke-width="1.5"/>
+    <text x="370" y="386" text-anchor="middle" font-weight="700" font-size="10.5">⑤ Response envelope</text>
+    <text x="370" y="401" text-anchor="middle" fill="#5b6474">dict · candidates[0]…text</text>
+
+    <rect x="298" y="444" width="144" height="52" rx="6" fill="#fff" stroke="#7a4cc2" stroke-width="1.5"/>
+    <text x="370" y="466" text-anchor="middle" font-weight="700" font-size="10.5">⑥ Validated recipe</text>
+    <text x="370" y="481" text-anchor="middle" fill="#5b6474">dict · validate_recipe_schema()</text>
+
+    <rect x="458" y="524" width="144" height="52" rx="6" fill="#fff" stroke="#2e8a57" stroke-width="1.5"/>
+    <text x="530" y="546" text-anchor="middle" font-weight="700" font-size="10.5">⑦ Evaluation record</text>
+    <text x="530" y="561" text-anchor="middle" fill="#5b6474">dict · evaluate_recipe()</text>
+
+    <rect x="138" y="604" width="144" height="52" rx="6" fill="#fff" stroke="#2f6fb5" stroke-width="1.5"/>
+    <text x="210" y="626" text-anchor="middle" font-weight="700" font-size="10.5">⑨ Recipe card</text>
+    <text x="210" y="641" text-anchor="middle" fill="#5b6474">display_recipe_card()</text>
+
+    <rect x="618" y="124" width="144" height="52" rx="6" fill="#fff" stroke="#c07a16" stroke-width="1.5"/>
+    <text x="690" y="146" text-anchor="middle" font-weight="700" font-size="10.5">② Inventory records</text>
+    <text x="690" y="161" text-anchor="middle" fill="#5b6474">list[dict] · load_inventory()</text>
+
+    <rect x="618" y="604" width="144" height="52" rx="6" fill="#fff" stroke="#c07a16" stroke-width="1.5"/>
+    <text x="690" y="626" text-anchor="middle" font-weight="700" font-size="10.5">⑧ History record</text>
+    <text x="690" y="641" text-anchor="middle" fill="#5b6474">{recipe, evaluation, created_at}</text>
+  </g>
+
+  <!-- data stores (Gane–Sarson style) -->
+  <g font-size="9">
+    <rect x="618" y="44" width="144" height="52" fill="#fff" stroke="#c07a16" stroke-width="1.5"/>
+    <rect x="618" y="44" width="30" height="52" fill="#f8e7cf" stroke="#c07a16" stroke-width="1.5"/>
+    <text x="633" y="74" text-anchor="middle" font-weight="700" fill="#c07a16" font-size="10.5">D1</text>
+    <text x="705" y="66" text-anchor="middle" font-weight="700" font-size="10">inventory.json</text>
+    <text x="705" y="81" text-anchor="middle" fill="#5b6474">JSON array on disk</text>
+
+    <rect x="618" y="684" width="144" height="52" fill="#fff" stroke="#c07a16" stroke-width="1.5"/>
+    <rect x="618" y="684" width="30" height="52" fill="#f8e7cf" stroke="#c07a16" stroke-width="1.5"/>
+    <text x="633" y="714" text-anchor="middle" font-weight="700" fill="#c07a16" font-size="10.5">D2</text>
+    <text x="705" y="706" text-anchor="middle" font-weight="700" font-size="10">recipe_history.json</text>
+    <text x="705" y="721" text-anchor="middle" fill="#5b6474">JSON array on disk</text>
+  </g>
+</svg>
+<figcaption><b>Figure 2.</b> Data flow diagram for recipe generation. Solid arrows carry data between states; the dashed red loop is the recovery path for a failed or invalid response (retry the same model on transient errors, otherwise move to the next model). If every attempt fails, an error goes to the user, <b>nothing is written to D2</b>, and control returns to the menu.</figcaption>
+</figure>
+
+<!-- ============================ PAGE 3 ============================ -->
+<h3>Inventory path (menu option 2): user input → file storage</h3>
+<figure>
+<svg viewBox="0 0 770 74" width="100%" role="img" aria-label="Inventory add flow">
+  <defs><marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3b4252"/></marker></defs>
+  <g stroke="#3b4252" stroke-width="1.4" fill="none" marker-end="url(#a3)">
+    <path d="M100,30 H122"/><path d="M262,30 H288"/><path d="M448,30 H474"/><path d="M624,30 H650"/>
+  </g>
+  <g font-size="9">
+    <rect x="2" y="4" width="98" height="52" rx="3" fill="#e5e7eb" stroke="#6b7280" stroke-width="1.6"/>
+    <text x="51" y="27" text-anchor="middle" font-weight="700" font-size="10.5">User</text><text x="51" y="42" text-anchor="middle" fill="#5b6474">types 5 fields</text>
+    <rect x="124" y="4" width="138" height="52" rx="6" fill="#fff" stroke="#2f6fb5" stroke-width="1.5"/>
+    <text x="193" y="27" text-anchor="middle" font-weight="700" font-size="10.5">Raw keystrokes</text><text x="193" y="42" text-anchor="middle" fill="#5b6474">"Tofu","1","300","g",…</text>
+    <rect x="290" y="4" width="158" height="52" rx="6" fill="#fff" stroke="#2f6fb5" stroke-width="1.5"/>
+    <text x="369" y="27" text-anchor="middle" font-weight="700" font-size="10.5">Item dict</text><text x="369" y="42" text-anchor="middle" fill="#5b6474">prompt_new_ingredient()</text>
+    <rect x="476" y="4" width="148" height="52" rx="6" fill="#fff" stroke="#c07a16" stroke-width="1.5"/>
+    <text x="550" y="27" text-anchor="middle" font-weight="700" font-size="10.5">Merged inventory</text><text x="550" y="42" text-anchor="middle" fill="#5b6474">add_inventory_item()</text>
+    <rect x="652" y="4" width="116" height="52" fill="#fff" stroke="#c07a16" stroke-width="1.5"/>
+    <rect x="652" y="4" width="28" height="52" fill="#f8e7cf" stroke="#c07a16" stroke-width="1.5"/>
+    <text x="666" y="34" text-anchor="middle" font-weight="700" fill="#c07a16" font-size="10.5">D1</text>
+    <text x="724" y="27" text-anchor="middle" font-weight="700">inventory.json</text><text x="724" y="42" text-anchor="middle" fill="#5b6474">save_inventory()</text>
+  </g>
+</svg>
+<figcaption><b>Figure 3.</b> The quantity is coerced to a positive finite <code>float</code> and the date to the canonical <code>YYYY-MM-DD</code> string; an existing item with the same name (case-insensitive) is updated rather than duplicated, and a new item gets the next <code>ing-NNN</code> id.</figcaption>
+</figure>
+
+<h3 class="page-break" style="margin-top:0">State of the data at each stage</h3>
+<p class="small">Example values come from the automated end-to-end test (T12), which drives the real CLI with scripted keystrokes and a hardcoded Gemini response.</p>
+<table class="tight">
+  <tr><th style="width:15%">State</th><th style="width:9%">Type</th><th style="width:24%">Transformation</th><th>Example value</th></tr>
+  <tr><td>① Raw keystrokes</td><td><code>str</code></td><td><code>input()</code> inside io_manager only</td><td class="ex">"4", "1", "20", "nuts", "", ""</td></tr>
+  <tr><td>② Validated criteria</td><td><code>dict</code></td><td><code>prompt_recipe_generation_criteria()</code>: typed, trimmed, comma-split</td><td class="ex">{"meal_type": "Breakfast", "max_cook_time_mins": 20, "allergies": ["nuts"], "mandatory_ingredients": [], "additional_notes": ""}</td></tr>
+  <tr><td>② Inventory records</td><td><code>list[dict]</code></td><td><code>load_inventory()</code>: JSON → objects; non-dict rows dropped</td><td class="ex">[{"id": "ing-001", "name": "Eggs", "quantity": 6, "unit": "pcs", "location": "Fridge", "expiry_date": "2026-10-09"}, …]</td></tr>
+  <tr><td>③ Prompt string</td><td><code>str</code></td><td><code>build_recipe_prompt()</code>: inventory + constraints + required JSON schema</td><td class="ex">"…- Eggs (6 pcs, Location: Fridge, Expiry: 2026-10-09) … Restrictions to avoid: nuts … You MUST respond strictly with a valid JSON object…"</td></tr>
+  <tr><td>④ Request payload</td><td><code>bytes</code></td><td><code>json.dumps().encode()</code>; POST, key in <code>x-goog-api-key</code> header</td><td class="ex">{"contents": [{"parts": [{"text": "&lt;prompt ③&gt;"}]}], "generationConfig": {"responseMimeType": "application/json", "temperature": 0.4}}</td></tr>
+  <tr><td>⑤ Response envelope</td><td><code>dict</code></td><td><code>json.loads()</code> of the HTTP body</td><td class="ex">{"candidates": [{"content": {"parts": [{"text": "{\"recipe_name\": \"Spinach &amp; Cheddar Omelette\", …}"}]}, "finishReason": "STOP"}]}</td></tr>
+  <tr><td>⑥ Validated recipe</td><td><code>dict</code></td><td><code>extract_recipe_json()</code> → <code>validate_recipe_schema()</code>: 8 fields type-checked, cast, trimmed</td><td class="ex">{"recipe_name": "Spinach &amp; Cheddar Omelette", "estimated_cook_time_mins": 15, "ingredients_used": ["3 Eggs", "50g Cheddar Cheese, shredded", "1 cup fresh Spinach"], "missing_ingredients": [], "required_tools": [...], "instructions": [...], …}</td></tr>
+  <tr><td>⑦ Evaluation record</td><td><code>dict</code></td><td><code>evaluate_recipe(⑥, ②, constraints)</code></td><td class="ex">{"outcome": "ACCEPTED", "status_code": "OPTIMAL_MATCH", "match_ratio": 1.0, "expiry_priority_score": 100.0, "rescued_items": [Eggs, Cheddar Cheese, Spinach], "waste_diverted_grams": 950, …}</td></tr>
+  <tr><td>⑧ History record → D2</td><td><code>dict</code> → JSON</td><td><code>save_recipe_to_history()</code>: append, write <code>.tmp</code>, atomic <code>os.replace()</code></td><td class="ex">{"recipe": {⑥}, "evaluation": {⑦}, "created_at": "2026-10-08 14:52:10"} appended to data/recipe_history.json</td></tr>
+  <tr><td>⑨ Recipe card</td><td>text</td><td><code>display_recipe_card(⑥, ⑦)</code></td><td class="ex">Outcome Status : [ACCEPTED] - OPTIMAL_MATCH · Expiry Priority : 100.0 / 100 · Food Waste Saved: ~950 grams</td></tr>
+</table>
+
+<h3>How the logic layer turns ⑥ into a verdict (⑦)</h3>
+<table class="tight">
+  <tr><th style="width:4%">#</th><th style="width:44%">Condition (checked in order; first match wins)</th><th style="width:17%">Outcome</th><th>status_code</th></tr>
+  <tr><td>1</td><td>Any ingredient matches a user allergen or a synonym of one</td><td><span class="pill rej">REJECTED</span></td><td class="mono">ALLERGEN_CONTAMINATION</td></tr>
+  <tr><td>2</td><td>Ingredient match ratio &lt; 50 % (pantry staples such as salt, black pepper and cooking oil are not counted)</td><td><span class="pill rej">REJECTED</span></td><td class="mono">INSUFFICIENT_INGREDIENTS</td></tr>
+  <tr><td>3</td><td>A must-include ingredient is absent from the recipe</td><td><span class="pill flag">FLAGGED</span></td><td class="mono">MISSING_MANDATORY_INGREDIENT</td></tr>
+  <tr><td>4</td><td>Cook time exceeds the user's limit</td><td><span class="pill flag">FLAGGED</span></td><td class="mono">EXCEEDS_TIME_LIMIT</td></tr>
+  <tr><td>5</td><td>Some ingredients missing, but ratio ≥ 50 %</td><td><span class="pill flag">FLAGGED</span></td><td class="mono">MISSING_SOME_INGREDIENTS</td></tr>
+  <tr><td>6</td><td>Otherwise</td><td><span class="pill ok">ACCEPTED</span></td><td class="mono">OPTIMAL_MATCH</td></tr>
+</table>
+
+<!-- ============================ PAGE 4 ============================ -->
+<h2 class="page-break">4. Exception Handling Matrix</h2>
+<p>All four required failure classes are covered. The <b>Test</b> column names the automated test (Section 5) that triggers each scenario offline and asserts the stated behaviour. No failure is allowed to crash the menu loop.</p>
+<table class="matrix">
+  <tr><th>#</th><th style="width:21%">Scenario</th><th style="width:24%">Detected by</th><th>Handling &amp; recovery → <span class="user">what the user sees</span></th><th style="width:6.5%">Test</th></tr>
+
+  <tr class="cat"><td colspan="5">A. API connection failure</td></tr>
+  <tr><td>1</td><td>No API key configured</td><td><code>get_api_key()</code> returns "" in <code>request_recipe_from_ai</code></td><td>Fails fast, before any network call. <span class="user">→ [ERROR] "Gemini API key is not configured…", then back to the menu.</span></td><td>T9 T12</td></tr>
+  <tr><td>2</td><td>Network down, DNS failure, refused connection, or 30 s timeout</td><td><code>URLError</code> / <code>TimeoutError</code> caught in <code>call_gemini_api</code></td><td>Returned as <code>(False, None, msg)</code> and logged; classified <i>retry</i>: 1.5 s back-off, 2 attempts × 3 models; nothing saved. <span class="user">→ "AI API service temporarily unavailable…" if all fail.</span></td><td>T9</td></tr>
+  <tr><td>3</td><td>Rate limited or server busy (HTTP 429 / 5xx)</td><td><code>HTTPError</code> → <code>classify_api_error()</code> = retry</td><td>Back off, retry the same model, then move down the cascade. <span class="user">→ Invisible if a retry succeeds.</span></td><td>T9</td></tr>
+  <tr><td>4</td><td>Invalid or revoked key (401, 403, <code>API_KEY_INVALID</code>)</td><td><code>classify_api_error()</code> = abort</td><td>Stops after one call, because no other model can succeed with a bad key. <span class="user">→ "AI request rejected (check your GEMINI_API_KEY)".</span></td><td>T9 T12</td></tr>
+  <tr><td>5</td><td>Model retired or request rejected (404 / 400)</td><td><code>classify_api_error()</code> = next_model</td><td>Skips the second attempt and moves to the next model in the cascade. <span class="user">→ Invisible if a fallback model succeeds.</span></td><td>T9</td></tr>
+
+  <tr class="cat"><td colspan="5">B. Malformed API response</td></tr>
+  <tr><td>6</td><td>HTTP body is not JSON, or JSON is not an object</td><td><code>JSONDecodeError</code> / <code>isinstance</code> check in <code>call_gemini_api</code></td><td>Counted as a failed attempt → retry, then cascade.</td><td>T9</td></tr>
+  <tr><td>7</td><td>No candidates (safety block), no parts, empty text, or a candidate that is not an object</td><td>Guard clauses + <code>AttributeError</code> / <code>TypeError</code> in <code>extract_recipe_json</code></td><td>Returns <code>(False, {}, reason)</code> and never raises; the request loop tries again.</td><td>T8</td></tr>
+  <tr><td>8</td><td>Prose or truncated JSON instead of a JSON object</td><td><code>JSONDecodeError</code> in <code>extract_recipe_json</code></td><td>Rejected; the next valid response is used (a malformed-then-valid sequence is tested).</td><td>T8 T9</td></tr>
+  <tr><td>9</td><td>Valid JSON wrapped in <code>```json</code> fences</td><td><code>strip_markdown_fences()</code></td><td>Fences are stripped and the JSON accepted (tolerant reader). <span class="user">→ Normal recipe card.</span></td><td>T8</td></tr>
+  <tr><td>10</td><td>Missing field, wrong type ("about 10 minutes", <code>true</code>), negative or NaN cook time, empty name, ingredients or steps</td><td><code>validate_recipe_schema()</code> (8 required fields, types, ranges)</td><td>Rejected with a field-specific reason; invalid data never reaches the logic layer. <span class="user">→ After the final attempt: [ERROR] with the last reason; nothing saved.</span></td><td>T4 T8</td></tr>
+
+  <tr class="cat"><td colspan="5">C. Corrupt or missing data file</td></tr>
+  <tr><td>11</td><td>File or <code>data/</code> folder missing (first run, fresh container), or empty file</td><td><code>os.path.exists</code> and an empty-content check in <code>load_json_data</code></td><td>Returns <code>[]</code> and creates the folder; the file is created on first save. <span class="user">→ "Your inventory is currently empty…"</span></td><td>T3 T10</td></tr>
+  <tr><td>12</td><td>Corrupt JSON (truncated or hand-edited)</td><td><code>JSONDecodeError</code> in <code>load_json_data</code></td><td>Logged; the file is <b>moved to</b> <code>*.corrupt-&lt;timestamp&gt;.bak</code>, so the next save cannot overwrite the original bytes; the app continues with <code>[]</code>.</td><td>T3 T10</td></tr>
+  <tr><td>13</td><td>Wrong shape (object instead of array, non-object rows)</td><td><code>isinstance</code> filters in <code>load_inventory</code> / <code>load_recipe_history</code></td><td>Invalid rows are dropped and valid rows kept.</td><td>T10</td></tr>
+  <tr><td>14</td><td>Unreadable file (permissions, invalid UTF-8)</td><td><code>OSError</code> / <code>UnicodeDecodeError</code></td><td>Logged; the default <code>[]</code> is returned and the app keeps running.</td><td>—</td></tr>
+  <tr><td>15</td><td>Write fails (read-only disk, bad path, unserialisable value)</td><td><code>OSError</code> / <code>TypeError</code> / <code>ValueError</code> in <code>save_json_data</code></td><td>Returns <code>False</code> and removes the temp file; the caller reports it. <span class="user">→ [ERROR] "Failed to save inventory to storage."</span></td><td>T10</td></tr>
+  <tr><td>16</td><td>Crash or power loss during a save</td><td>Prevented by design</td><td>Data is written to <code>file.tmp</code> and then swapped in with an atomic <code>os.replace()</code>, so the stored file is never half-written.</td><td>T10</td></tr>
+
+  <tr class="cat"><td colspan="5">D. Invalid user input</td></tr>
+  <tr><td>17</td><td>Blank text; non-numeric or out-of-range menu, meal or storage choice</td><td><code>prompt_menu_choice</code>, <code>prompt_string</code>, <code>prompt_meal_type</code>, <code>prompt_storage_location</code></td><td>Re-prompts in a loop; the allergy list is trimmed and blank entries dropped. <span class="user">→ "Invalid option. Please choose between 1 and 7."</span></td><td>T11</td></tr>
+  <tr><td>18</td><td>Bad or impossible date (<code>12-10-2026</code>, <code>2026-02-30</code>)</td><td><code>strptime</code> <code>ValueError</code> in <code>prompt_date</code></td><td>Re-prompts with an example; the date is stored canonically as <code>YYYY-MM-DD</code>.</td><td>T11 T12</td></tr>
+  <tr><td>19</td><td>Zero, negative, non-numeric, <code>inf</code> or <code>nan</code> quantity or cook time</td><td><code>prompt_positive_number</code> (<code>ValueError</code>, <code>math.isfinite</code>, &gt; 0)</td><td>Re-prompts. <span class="user">→ "Number must be strictly greater than 0." / "…a finite value."</span></td><td>T11 T12</td></tr>
+  <tr><td>20</td><td>Removing an unknown item; fewer than 2 items before an AI request</td><td><code>remove_inventory_item</code> flag; rule in <code>handle_generate_recipe</code></td><td>Nothing is saved and no API call is made. <span class="user">→ [WARNING] "…was not found" / "…add more items".</span></td><td>T12</td></tr>
+  <tr><td>21</td><td>Ctrl+C or closed input stream (EOF, e.g. <code>docker run</code> without <code>-it</code>)</td><td><code>KeyboardInterrupt</code> / <code>EOFError</code> in <code>main()</code></td><td>Clean exit with code 0; every action had already been saved. <span class="user">→ "Input stream closed. Exiting … safely."</span></td><td>T12</td></tr>
+</table>
+
+<!-- ============================ PAGE 5 ============================ -->
+<h2 class="page-break">5. Automated Testing</h2>
+<p><code>tests/test_pipeline.py</code> is a procedural test runner: it defines no classes and never contacts the live API. It uses <b>hardcoded sample Gemini responses</b> (<code>tests/sample_ai_responses.py</code>), each a full <code>generateContent</code> envelope as the real API returns it, and substitutes <code>call_gemini_api</code> / <code>input()</code> with scripted stand-ins. It exits non-zero on any failure, so CI and Docker can gate on it.</p>
+<table class="tight">
+  <tr><th style="width:5%">ID</th><th style="width:30%">Test</th><th>What it proves</th></tr>
+  <tr><td>T1</td><td>Zero-classes constraint</td><td>A regex scan of every <code>.py</code> file finds no <code>class</code> definition</td></tr>
+  <tr><td>T2</td><td>print() localisation</td><td><code>print(</code> appears only in <code>src/io_manager.py</code> (and the test reporter)</td></tr>
+  <tr><td>T3</td><td>Data persistence &amp; resilience</td><td>Save/load round trip, dedupe and remove, expiry query, history filters, corrupt-file fallback</td></tr>
+  <tr><td>T4</td><td>AI schema validation</td><td>A valid payload is accepted; a missing field, wrong type or empty list is rejected</td></tr>
+  <tr><td>T5</td><td>Logic multi-condition rules</td><td>Allergen gate, expiry score, and the ACCEPTED / FLAGGED / REJECTED branches</td></tr>
+  <tr><td>T6</td><td><b>Logic rules on sample AI responses</b></td><td>Six hardcoded responses → <code>extract_recipe_json</code> → <code>evaluate_recipe</code> reach every verdict, with exact score (100), ratio (0.6) and waste (950 g)</td></tr>
+  <tr><td>T7</td><td>Logic helper functions</td><td>Fixed-date expiry maths, fuzzy matching, staples, unit conversion, allergen synonyms</td></tr>
+  <tr><td>T8</td><td>Malformed AI responses</td><td>Nine malformed envelopes are rejected without raising; a fenced-JSON response is accepted</td></tr>
+  <tr><td>T9</td><td>Offline API failure handling</td><td>Network down, timeout, non-JSON body, invalid key, 404 cascade, 429 recovery, missing key, real refused socket</td></tr>
+  <tr><td>T10</td><td>Corrupt &amp; unwritable files</td><td>Quarantine to .bak, empty and wrong-shape files, atomic save, write failure returns <code>False</code></td></tr>
+  <tr><td>T11</td><td>I/O re-prompting</td><td>Every prompt rejects blank, text, out-of-range, bad-date and inf/nan input until a valid value is given</td></tr>
+  <tr><td>T12</td><td><b>End-to-end pipeline (offline)</b></td><td>Drives the real CLI: add item → JSON file; remove unknown item → no change; recipe → history record; API 401 → nothing saved; EOF → clean exit</td></tr>
+</table>
+<p><b>Result:</b> 12/12 pass locally (Python 3.14, Windows 11) and inside the Docker image (Python 3.12-slim, Linux), with <b>no API key and no network</b>: <code>docker compose run --rm test</code>.</p>
+
+<h2>6. DevOps: Version Control, CI and Docker</h2>
+<div class="two-col">
+<div>
+<h3 style="margin-top:2px">Git workflow</h3>
+<ul>
+  <li>Work happens on feature branches (e.g. <code>feature/part1-deliverables</code>) and is merged into <code>main</code> by pull request once CI passes.</li>
+  <li>One logical change per commit, with a descriptive message, e.g. <i>"quarantine corrupt data files and make JSON saves atomic"</i>.</li>
+  <li><code>.env</code> is git-ignored (only <code>.env.example</code> is committed), and the API key is sent in a header, never in a URL.</li>
+</ul>
+<h3>Docker</h3>
+<ul>
+  <li><code>Dockerfile</code> sits in the repository root and builds on <code>python:3.12-slim</code> with zero third-party packages (standard library only), giving a 43 MB compressed image.</li>
+  <li><code>/app/data</code> is a volume, so data persists between runs. <code>docker compose run --rm app</code> starts the app; the <code>test</code> service needs no <code>.env</code>.</li>
+</ul>
+</div>
+<div>
+<h3 style="margin-top:2px">CI pipeline (<code>.github/workflows/ci.yml</code>)</h3>
+<p class="small" style="margin-bottom:3px">GitHub Actions runs on every push and on every pull request into <code>main</code>:</p>
+<ol style="margin:0 0 6px; padding-left:17px">
+  <li><b>Lint &amp; test</b> on Python 3.10 and 3.12: <code>ruff</code> (syntax errors, undefined names), byte-compile, then the full offline suite with an empty API key.</li>
+  <li><b>Docker</b>, after step 1 passes: build the image, run the suite <i>inside</i> the container, and smoke-test that the CLI starts and exits cleanly.</li>
+</ol>
+<p class="small">A red job blocks the merge, so <code>main</code> always builds, passes its tests and runs in a container.</p>
+</div>
+</div>
+
+<h2>7. Known Limitations</h2>
+<ul>
+  <li>Ingredient matching is lexical (substring and plural stemming), so "coconut milk" matches "milk". Semantic or AI-assisted matching would be more precise.</li>
+  <li>The waste figure is a heuristic: about 100 g per countable unit, with the whole stock of each rescued item counted. Quantities are not decremented after cooking.</li>
+  <li>Pantry staples do not lower the match ratio, but they are still listed as missing and can therefore produce an informational FLAGGED verdict.</li>
+</ul>
+
+</body>
+</html>
