@@ -2,7 +2,9 @@
 AI Manager Module
 Responsibility: Prompt construction, Gemini REST API communication, JSON schema validation, error recovery.
 Architecture Layer: AI Processing Layer
-Constraints: 100% procedural (NO classes), NO print() statements, ZERO domain logic.
+Framework functions: build_prompt(record), call_api(prompt), parse_response(raw), validate_response(data),
+orchestrated by process(record).
+Constraints: 100% procedural (no classes), no terminal I/O, no domain logic.
 """
 
 import os
@@ -52,19 +54,20 @@ def get_api_key() -> str:
     return os.environ.get("GEMINI_API_KEY", "").strip()
 
 
-def build_recipe_prompt(
-    inventory_items: list[dict],
-    meal_type: str,
-    max_cook_time_mins: int,
-    allergies: list[str],
-    additional_notes: str = "",
-    mandatory_ingredients: list[str] = None
-) -> str:
+def build_prompt(record: dict) -> str:
     """
-    Constructs a detailed structured prompt instructing the AI to output
-    a valid JSON recipe maximizing the use of near-expiry ingredients,
-    including kitchen tools and mandatory user ingredients.
+    Constructs a structured prompt from a recipe-request record instructing the AI to return
+    a JSON recipe that maximises use of near-expiry ingredients.
+    record keys: inventory, meal_type, max_cook_time_mins, allergies,
+                 mandatory_ingredients (optional), additional_notes (optional)
     """
+    inventory_items = record.get("inventory", [])
+    meal_type = record.get("meal_type", "Any")
+    max_cook_time_mins = record.get("max_cook_time_mins", 30)
+    allergies = record.get("allergies", [])
+    mandatory_ingredients = record.get("mandatory_ingredients", [])
+    additional_notes = record.get("additional_notes", "")
+
     items_desc = []
     for item in inventory_items:
         name = item.get("name", "Unknown")
@@ -111,16 +114,19 @@ Respond ONLY with raw JSON. Do not include markdown ticks, explanation text, or 
     return prompt
 
 
-def call_gemini_api(
+def call_api(
     prompt: str,
-    api_key: str,
+    api_key: str | None = None,
     model: str = DEFAULT_MODEL,
     timeout_seconds: int = 30
 ) -> tuple[bool, dict | None, str]:
     """
-    Calls the Google Gemini REST API generateContent endpoint with application/json configuration.
-    Returns: (success: bool, raw_json_dict: dict | None, error_message: str)
+    Sends the prompt to the Gemini generateContent endpoint, requesting application/json output.
+    Connection errors, timeouts and HTTP errors are logged and returned, never raised.
+    Returns: (success: bool, raw_response: dict | None, error_message: str)
     """
+    if api_key is None:
+        api_key = get_api_key()
     if not api_key:
         msg = "GEMINI_API_KEY is not configured."
         logger.error(msg)
@@ -134,7 +140,7 @@ def call_gemini_api(
         }],
         "generationConfig": {
             "responseMimeType": "application/json",
-            "temperature": 0.4
+            "temperature": 0.0
         }
     }
 
@@ -177,10 +183,10 @@ def call_gemini_api(
         return False, None, msg
 
 
-def validate_recipe_schema(recipe_data: Any) -> tuple[bool, dict, str]:
+def validate_response(recipe_data: Any) -> tuple[bool, dict, str]:
     """
-    Validates that the received dictionary contains all expected schema fields
-    with valid types.
+    Checks the parsed AI output against the recipe schema: required keys, correct types and
+    values in range. Returns a cleaned copy; nothing downstream reads an unvalidated field.
     Returns: (is_valid: bool, validated_dict: dict, error_message: str)
     """
     if not isinstance(recipe_data, dict):
@@ -259,73 +265,58 @@ def classify_api_error(error_message: str) -> str:
     return "retry"
 
 
-def extract_recipe_json(gemini_response: dict) -> tuple[bool, dict, str]:
+def parse_response(raw: dict) -> tuple[bool, Any, str]:
     """
-    Extracts the structured JSON payload from Gemini generateContent response candidate.
+    Extracts the model's text from a generateContent response and parses it as JSON.
+    Handles unexpected formats (no candidates, empty text, prose, markdown fences, wrong shapes)
+    by returning an error instead of raising. Does not check the schema: see validate_response().
+    Returns: (success: bool, parsed_json: Any, error_message: str)
     """
     try:
-        candidates = gemini_response.get("candidates", [])
+        candidates = raw.get("candidates", [])
         if not candidates:
-            return False, {}, "No candidates returned by Gemini API."
+            return False, None, "No candidates returned by Gemini API."
 
         content_parts = candidates[0].get("content", {}).get("parts", [])
         if not content_parts:
-            return False, {}, "No content parts returned in candidate."
+            return False, None, "No content parts returned in candidate."
 
         text_content = content_parts[0].get("text", "").strip()
         if not text_content:
-            return False, {}, "Candidate returned empty text."
+            return False, None, "Candidate returned empty text."
 
-        parsed = json.loads(strip_markdown_fences(text_content))
-        return validate_recipe_schema(parsed)
+        return True, json.loads(strip_markdown_fences(text_content)), ""
 
     except (KeyError, IndexError, AttributeError, TypeError, json.JSONDecodeError) as err:
-        msg = f"Failed to extract structured recipe JSON: {err}"
+        msg = f"Failed to parse structured JSON from AI response: {err}"
         logger.error(msg)
-        return False, {}, msg
+        return False, None, msg
 
 
 MODELS_CASCADE = ["gemini-3.6-flash", "gemini-flash-latest", "gemini-2.5-flash-lite"]
 
 
-def request_recipe_from_ai(
-    inventory: list[dict],
-    meal_type: str,
-    max_cook_time_mins: int,
-    allergies: list[str],
-    additional_notes: str = "",
-    mandatory_ingredients: list[str] = None,
-    model: str = DEFAULT_MODEL
-) -> tuple[bool, dict, str]:
+def process(record: dict, model: str = DEFAULT_MODEL) -> tuple[bool, dict, str]:
     """
-    Procedural facade orchestrating the AI request pipeline:
-    1. Builds prompt with optional mandatory ingredients and required kitchen tools
-    2. Calls Gemini API with fallback cascade and graceful retry
-    3. Validates structured JSON schema
-    4. Handles errors gracefully without crashing
-    Returns: (success: bool, recipe_dict: dict, error_or_status_message: str)
+    Runs one recipe-request record through the AI engine:
+    build_prompt -> call_api (model cascade, retry policy) -> parse_response -> validate_response.
+    Returns: (success: bool, validated_recipe: dict, error_or_status_message: str)
     """
     api_key = get_api_key()
     if not api_key:
         return False, {}, "Gemini API key is not configured. Please set GEMINI_API_KEY."
 
-    prompt = build_recipe_prompt(
-        inventory_items=inventory,
-        meal_type=meal_type,
-        max_cook_time_mins=max_cook_time_mins,
-        allergies=allergies,
-        additional_notes=additional_notes,
-        mandatory_ingredients=mandatory_ingredients
-    )
+    prompt = build_prompt(record)
 
     models_to_try = [model] + [m for m in MODELS_CASCADE if m != model]
     last_error = ""
 
     for target_model in models_to_try:
         for attempt in range(2):  # Try twice per model
-            success, raw_resp, err = call_gemini_api(prompt=prompt, api_key=api_key, model=target_model)
+            success, raw_resp, err = call_api(prompt=prompt, api_key=api_key, model=target_model)
             if success and raw_resp is not None:
-                valid, validated_recipe, val_err = extract_recipe_json(raw_resp)
+                parsed_ok, parsed, parse_err = parse_response(raw_resp)
+                valid, validated_recipe, val_err = validate_response(parsed) if parsed_ok else (False, {}, parse_err)
                 if valid:
                     return True, validated_recipe, "Recipe generated and schema validated successfully."
                 last_error = f"Schema validation error on {target_model}: {val_err}"
