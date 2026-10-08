@@ -33,18 +33,42 @@ def load_json_data(file_path: str, default_data: Any) -> Any:
     try:
         with open(file_path, "r", encoding="utf-8") as file:
             content = file.read().strip()
-            if not content:
-                return default_data
-            return json.loads(content)
-    except (json.JSONDecodeError, OSError) as err:
+    except (OSError, UnicodeDecodeError) as err:
         logger.error("Error reading %s: %s. Returning default fallback.", file_path, err)
         return default_data
+
+    if not content:
+        return default_data
+
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError as err:
+        logger.error("Corrupt JSON in %s: %s. Returning default fallback.", file_path, err)
+        quarantine_corrupt_file(file_path)
+        return default_data
+
+
+def quarantine_corrupt_file(file_path: str) -> str:
+    """
+    Moves a corrupt data file aside to '<name>.corrupt-<timestamp>.bak' so the next save
+    starts clean without destroying the original bytes (kept for manual recovery).
+    Returns the backup path, or "" if the move failed.
+    """
+    backup_path = f"{file_path}.corrupt-{datetime.now().strftime('%Y%m%d%H%M%S')}.bak"
+    try:
+        os.replace(file_path, backup_path)
+        logger.warning("Corrupt file %s backed up to %s", file_path, backup_path)
+        return backup_path
+    except OSError as err:
+        logger.error("Could not back up corrupt file %s: %s", file_path, err)
+        return ""
 
 
 def save_json_data(file_path: str, data: Any) -> bool:
     """
     Saves python data structure into JSON flat file.
-    Creates parent directories if necessary.
+    Creates parent directories if necessary. Writes to a temp file first and then
+    atomically replaces the target, so an interrupted write cannot corrupt existing data.
     Returns True if successful, False otherwise.
     """
     directory = os.path.dirname(file_path)
@@ -55,22 +79,31 @@ def save_json_data(file_path: str, data: Any) -> bool:
             logger.error("Failed to create directory %s: %s", directory, err)
             return False
 
+    temp_path = f"{file_path}.tmp"
     try:
-        with open(file_path, "w", encoding="utf-8") as file:
+        with open(temp_path, "w", encoding="utf-8") as file:
             json.dump(data, file, indent=2, ensure_ascii=False)
+        os.replace(temp_path, file_path)
         return True
-    except OSError as err:
+    except (OSError, TypeError, ValueError) as err:
         logger.error("Error writing JSON to %s: %s", file_path, err)
+        if os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
         return False
 
 
 def load_inventory(file_path: str = "data/inventory.json") -> list[dict]:
     """
     Loads fridge and pantry inventory records from disk.
+    Non-list files and non-dict records are discarded so downstream layers can rely on the shape.
     """
     data = load_json_data(file_path, default_data=[])
     if isinstance(data, list):
-        return data
+        return [item for item in data if isinstance(item, dict)]
+    logger.error("Inventory file %s does not contain a JSON list. Using empty inventory.", file_path)
     return []
 
 
@@ -124,10 +157,12 @@ def remove_inventory_item(inventory: list[dict], item_name: str) -> tuple[list[d
 def load_recipe_history(file_path: str = "data/recipe_history.json") -> list[dict]:
     """
     Loads saved recipe records from disk.
+    Non-list files and non-dict records are discarded so downstream layers can rely on the shape.
     """
     data = load_json_data(file_path, default_data=[])
     if isinstance(data, list):
-        return data
+        return [record for record in data if isinstance(record, dict)]
+    logger.error("History file %s does not contain a JSON list. Using empty history.", file_path)
     return []
 
 
