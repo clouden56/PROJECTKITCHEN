@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/clouden56/PROJECTKITCHEN/actions/workflows/ci.yml/badge.svg)](https://github.com/clouden56/PROJECTKITCHEN/actions/workflows/ci.yml)
 
-An AI-powered recipe suggestion and food-waste prevention system built for **INF1009 Programming Fundamentals (Team Project)**.
+An AI-powered recipe suggestion and food-waste prevention system built for **INF1103 Programming Fundamentals (Team Project)**.
 
 ---
 
@@ -37,10 +37,10 @@ User / Terminal
 
 | Module | Architectural Role | Constraints & Features |
 | :--- | :--- | :--- |
-| **`src/io_manager.py`** | **Input Layer** | • Collects structured terminal inputs.<br>• Re-prompts on invalid data (e.g. invalid date formats, non-numeric cook times).<br>• **100% of all `print()` calls in the application reside here and nowhere else.**<br>• Formats tables, recipe cards, and warning banners. |
-| **`src/ai_manager.py`** | **AI Processing Layer** | • **Zero domain logic** (purely handles LLM interaction).<br>• Generates structured prompts and invokes Gemini API with structured JSON output schema.<br>• Validates output schema strictly; logs and retries with model cascades (`gemini-3.6-flash`, `gemini-flash-latest`, `gemini-2.5-flash-lite`).<br>• Never crashes on network or API failures. |
-| **`src/logic_manager.py`** | **Logic Layer (Domain Brain)** | • **Allergen & Safety Gate**: Rejects recipes containing user allergens or synonyms.<br>• **Expiry Priority Scoring**: Rewards recipes that consume ingredients expiring in $\le 3$ days.<br>• **Multi-Condition Decision Rule**: Determines outcome (`ACCEPTED`, `FLAGGED`, `REJECTED`) based on allergen safety, ingredient match ratio ($\ge 50\%$), and cook time limits.<br>• **Waste Impact Calculation**: Estimates grams of food diverted from disposal. |
-| **`src/data_manager.py`** | **Data Layer** | • Loads records on startup and persists inventory/recipes to flat JSON files (`data/`).<br>• Implements query and filter functions (`query_items_by_expiry`, `filter_recipes_by_meal_type`, `search_recipes_by_ingredient`).<br>• Handles missing, empty, or corrupt files gracefully without crashing. |
+| **`src/io_manager.py`** | **Input Layer** | • Collects structured terminal inputs.<br>• Re-prompts on invalid data (e.g. invalid date formats, non-numeric cook times).<br>• **Every `print()` and `input()` call in the codebase lives here and nowhere else** (enforced by a grep-strict test).<br>• Returns typed dicts (`prompt_recipe_generation_criteria`, `prompt_new_ingredient`, `prompt_history_filter`).<br>• Formats tables, recipe cards, and warning banners. |
+| **`src/ai_manager.py`** | **AI Processing Layer** | • **Zero domain logic** (purely handles LLM interaction).<br>• Framework API: `build_prompt(record)`, `call_api(prompt)`, `parse_response(raw)`, `validate_response(data)`, orchestrated by `process(record)`.<br>• Requests JSON output (temperature 0 for repeatable results) and validates the schema strictly; logs and retries with model cascades (`gemini-3.6-flash`, `gemini-flash-latest`, `gemini-2.5-flash-lite`).<br>• Never crashes on network or API failures. |
+| **`src/logic_manager.py`** | **Logic Layer (Domain Brain)** | • **Allergen & Safety Gate**: Rejects recipes containing user allergens or synonyms.<br>• **Expiry Priority Scoring**: Rewards recipes that consume ingredients expiring in $\le 3$ days.<br>• Framework API: `evaluate(record)`, `score(record)`, `route(evaluation)`.<br>• **Multi-Condition Decision Rule** (`route`): Determines outcome (`ACCEPTED`, `FLAGGED`, `REJECTED`) based on allergen safety, ingredient match ratio ($\ge 50\%$), and cook time limits.<br>• **Waste Impact Calculation**: Estimates grams of food diverted from disposal. |
+| **`src/data_manager.py`** | **Data Layer** | • Framework API: `save(record)`, `load()` (called on startup), `query(filter_fn)` with filter builders `meal_type_filter` / `ingredient_filter`.<br>• Persists inventory and evaluated recipes to flat JSON files (`data/`); `query_items_by_expiry` finds urgent items.<br>• Handles missing, empty, or corrupt files gracefully without crashing. |
 | **`main.py`** | **Application Coordinator** | • Orchestrates pipeline flow between the four managers with 100% procedural functions and zero `print()` statements. |
 
 ---
@@ -87,7 +87,7 @@ The suite runs **fully offline**: no API key and no network are needed. It uses 
 | # | Test | Covers |
 |---|------|--------|
 | 1 | `test_zero_classes_in_codebase` | No `class` definitions anywhere |
-| 2 | `test_no_prints_outside_io_manager` | `print()` only in `io_manager` |
+| 2 | `test_no_prints_outside_io_manager` | `print(` / `input(` appear only in `io_manager` (grep-strict) |
 | 3 | `test_data_manager_operations` | Save/load, queries, corrupt-file fallback |
 | 4 | `test_ai_manager_schema_validation` | Schema accepts valid / rejects malformed payloads |
 | 5 | `test_logic_manager_rules` | Allergen gate, expiry scoring, multi-condition outcomes |
@@ -96,7 +96,7 @@ The suite runs **fully offline**: no API key and no network are needed. It uses 
 | 8 | `test_ai_manager_rejects_malformed_responses` | 9 malformed envelopes rejected without exceptions |
 | 9 | `test_ai_pipeline_offline_failure_handling` | Network down, timeout, invalid key, 404 cascade, 429 retry |
 | 10 | `test_data_manager_corrupt_and_unwritable_files` | Corrupt-file quarantine, atomic saves, write failures |
-| 11 | `test_io_manager_reprompts_invalid_input` | Every prompt re-asks on invalid input |
+| 11 | `test_io_manager_reprompts_bad_entries` | Every prompt re-asks on invalid input |
 | 12 | `test_end_to_end_pipeline_offline` | Real CLI driven by scripted keystrokes through to the JSON files |
 
 ---
