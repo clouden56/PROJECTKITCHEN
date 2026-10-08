@@ -2,7 +2,7 @@
 Hardcoded sample Gemini API responses used by the offline test suite.
 Each SAMPLE_* constant is a full generateContent response envelope exactly as the
 live API returns it, so tests exercise the real parsing path without network access.
-Constraints: 100% procedural (NO classes), NO print() statements.
+Constraints: 100% procedural (no classes), no terminal I/O.
 """
 
 import json
