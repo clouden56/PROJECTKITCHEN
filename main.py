@@ -2,7 +2,7 @@
 Main Application Coordinator
 Responsibility: Orchestrates the 4-layer pipeline:
 User / file -> io_manager -> ai_manager -> logic_manager -> data_manager
-Constraints: 100% procedural (NO classes), NO print() calls (delegates all output to io_manager).
+Constraints: 100% procedural (no classes); all terminal I/O is delegated to io_manager.
 """
 
 import os
@@ -65,17 +65,16 @@ def handle_remove_item(inventory_file: str) -> None:
 
 def handle_generate_recipe(inventory_file: str, history_file: str) -> None:
     """
-    Pipeline Execution:
-    1. Collect user constraints (io_manager)
-    2. Check minimum inventory input (business validation)
-    3. Call Gemini AI with structured schema (ai_manager)
-    4. Apply multi-condition domain rules & scoring (logic_manager)
-    5. Save evaluated record to flat-file storage (data_manager)
-    6. Display formatted recipe card and verdict (io_manager)
+    One record through the pipeline, growing at each stage:
+    1. io_manager      -> typed request record (meal, time limit, allergies, must-haves)
+    2. data_manager    -> + current inventory
+    3. ai_manager      -> + validated AI recipe (every request goes through the API)
+    4. logic_manager   -> + evaluation (business rules, score, route)
+    5. data_manager    -> appended to recipe history
+    6. io_manager      -> recipe card and verdict
     """
     inventory = data_manager.load_inventory(inventory_file)
 
-    # Business rule: check minimum input
     if len(inventory) < 2:
         io_manager.display_message(
             "You have less than 2 ingredients recorded. Please add more items to your inventory "
@@ -85,47 +84,32 @@ def handle_generate_recipe(inventory_file: str, history_file: str) -> None:
         io_manager.prompt_continue()
         return
 
-    # Collect parameters via io_manager
-    criteria = io_manager.prompt_recipe_generation_criteria()
+    record = io_manager.prompt_recipe_generation_criteria()
+    record["inventory"] = inventory
 
     io_manager.display_message(
         "Consulting Gemini AI with your inventory and expiry constraints... Please wait.",
         "info"
     )
 
-    # 1. AI Processing Layer: Call Gemini API and schema validation
-    success, recipe, error_msg = ai_manager.request_recipe_from_ai(
-        inventory=inventory,
-        meal_type=criteria["meal_type"],
-        max_cook_time_mins=criteria["max_cook_time_mins"],
-        allergies=criteria["allergies"],
-        additional_notes=criteria["additional_notes"],
-        mandatory_ingredients=criteria.get("mandatory_ingredients", [])
-    )
-
+    success, recipe, error_msg = ai_manager.process(record)
     if not success:
         io_manager.display_message(f"AI Generation Error: {error_msg}", "error")
         io_manager.prompt_continue()
         return
 
-    # 2. Logic Layer: Evaluate multi-condition domain rules
-    evaluation = logic_manager.evaluate_recipe(
-        recipe=recipe,
-        inventory=inventory,
-        max_cook_time_mins=criteria["max_cook_time_mins"],
-        user_allergies=criteria["allergies"],
-        mandatory_ingredients=criteria.get("mandatory_ingredients", [])
+    record["recipe"] = recipe
+    evaluation = logic_manager.evaluate(record)
+
+    saved = data_manager.save(
+        {
+            "recipe": recipe,
+            "evaluation": evaluation,
+            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        },
+        history_file
     )
 
-    # 3. Data Layer: Persist record to recipe history
-    history_record = {
-        "recipe": recipe,
-        "evaluation": evaluation,
-        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }
-    saved = data_manager.save_recipe_to_history(history_record, history_file)
-
-    # 4. Input/Output Layer: Display recipe card
     io_manager.display_recipe_card(recipe, evaluation)
     if not saved:
         io_manager.display_message("Recipe could not be saved to history (storage error).", "warning")
@@ -134,31 +118,22 @@ def handle_generate_recipe(inventory_file: str, history_file: str) -> None:
 
 def handle_view_history(history_file: str) -> None:
     """
-    Views or filters recipe history by meal type or ingredient.
+    Views recipe history, optionally filtered via data_manager.query().
     """
-    history = data_manager.load_recipe_history(history_file)
-    if not history:
+    if not data_manager.load(history_file):
         io_manager.display_message("Recipe history is empty.", "info")
         io_manager.prompt_continue()
         return
 
-    io_manager.print_banner("Recipe History Explorer")
-    io_manager.print_divider()
-    choice = io_manager.prompt_string(
-        "Filter by: [A]ll, [M]eal Type, [I]ngredient search (A/M/I)"
-    ).upper()
-
-    if choice == "M":
-        meal = io_manager.prompt_meal_type()
-        filtered = data_manager.filter_recipes_by_meal_type(history, meal)
-        io_manager.display_recipe_history(filtered)
-    elif choice == "I":
-        ing = io_manager.prompt_string("Enter ingredient name to search for")
-        filtered = data_manager.search_recipes_by_ingredient(history, ing)
-        io_manager.display_recipe_history(filtered)
+    request = io_manager.prompt_history_filter()
+    if request["mode"] == "meal_type":
+        records = data_manager.query(data_manager.meal_type_filter(request["value"]), history_file)
+    elif request["mode"] == "ingredient":
+        records = data_manager.query(data_manager.ingredient_filter(request["value"]), history_file)
     else:
-        io_manager.display_recipe_history(history)
+        records = data_manager.load(history_file)
 
+    io_manager.display_recipe_history(records)
     io_manager.prompt_continue()
 
 
@@ -191,6 +166,8 @@ def run_application(
     """
     io_manager.print_banner("Welcome to Fridge Recipe Tracker")
     io_manager.display_message("AI-Powered Sustainability & Meal Planner", "info")
+    saved_recipes = data_manager.load(history_file)
+    io_manager.display_message(f"Loaded {len(saved_recipes)} saved recipe(s) from {history_file}.", "info")
 
     while True:
         io_manager.display_main_menu()
