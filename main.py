@@ -5,6 +5,8 @@ User / file -> io_manager -> ai_manager -> logic_manager -> data_manager
 Constraints: 100% procedural (NO classes), NO print() calls (delegates all output to io_manager).
 """
 
+import os
+import logging
 from datetime import datetime
 from src import io_manager
 from src import ai_manager
@@ -51,9 +53,10 @@ def handle_remove_item(inventory_file: str) -> None:
     target = io_manager.prompt_string("Enter the name of the ingredient to remove")
     updated_inv, removed = data_manager.remove_inventory_item(inventory, target)
 
-    if removed:
-        data_manager.save_inventory(updated_inv, inventory_file)
+    if removed and data_manager.save_inventory(updated_inv, inventory_file):
         io_manager.display_message(f"Successfully removed '{target}' from inventory.", "success")
+    elif removed:
+        io_manager.display_message("Failed to save inventory to storage. No changes were made.", "error")
     else:
         io_manager.display_message(f"Ingredient '{target}' was not found in inventory.", "warning")
 
@@ -83,7 +86,7 @@ def handle_generate_recipe(inventory_file: str, history_file: str) -> None:
         return
 
     # Collect parameters via io_manager
-    criteria = io_manager.prompt_recipe_preferences_or_request = io_manager.prompt_recipe_generation_criteria()
+    criteria = io_manager.prompt_recipe_generation_criteria()
 
     io_manager.display_message(
         "Consulting Gemini AI with your inventory and expiry constraints... Please wait.",
@@ -120,10 +123,12 @@ def handle_generate_recipe(inventory_file: str, history_file: str) -> None:
         "evaluation": evaluation,
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
-    data_manager.save_recipe_to_history(history_record, history_file)
+    saved = data_manager.save_recipe_to_history(history_record, history_file)
 
     # 4. Input/Output Layer: Display recipe card
     io_manager.display_recipe_card(recipe, evaluation)
+    if not saved:
+        io_manager.display_message("Recipe could not be saved to history (storage error).", "warning")
     io_manager.prompt_continue()
 
 
@@ -208,6 +213,35 @@ def run_application(
             break
 
 
+def configure_logging(log_file: str = "data/app.log") -> None:
+    """
+    Routes diagnostic logs from all managers to a file so they never interleave with the
+    terminal UI. If the file cannot be opened, logs are discarded rather than crashing.
+    """
+    try:
+        os.makedirs(os.path.dirname(log_file), exist_ok=True)
+        logging.basicConfig(
+            filename=log_file,
+            level=logging.INFO,
+            format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+            encoding="utf-8"
+        )
+    except OSError:
+        logging.getLogger().addHandler(logging.NullHandler())
+
+
+def main() -> None:
+    """
+    Entry point: runs the application and exits cleanly on Ctrl+C or closed input stream
+    (e.g. running the container without -it) instead of printing a traceback.
+    """
+    configure_logging()
+    try:
+        run_application()
+    except (KeyboardInterrupt, EOFError):
+        io_manager.display_message("Input stream closed. Exiting Fridge Recipe Tracker safely.", "info")
+
+
 if __name__ == "__main__":
-    run_application()
+    main()
 
