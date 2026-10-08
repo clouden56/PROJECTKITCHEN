@@ -335,6 +335,43 @@ def display_recipe_history(history: list[dict]) -> None:
         print("-" * 50)
 
 
+def prompt_history_filter() -> dict:
+    """
+    Asks how to filter recipe history and returns a typed filter request:
+    {"mode": "all"} | {"mode": "meal_type", "value": <meal>} | {"mode": "ingredient", "value": <text>}.
+    """
+    print_banner("Recipe History Explorer")
+    print_divider()
+    while True:
+        choice = input("Filter by: [A]ll, [M]eal Type, [I]ngredient search (A/M/I): ").strip().upper()
+        if choice == "A":
+            return {"mode": "all"}
+        if choice == "M":
+            return {"mode": "meal_type", "value": prompt_meal_type()}
+        if choice == "I":
+            return {"mode": "ingredient", "value": prompt_string("Enter ingredient name to search for")}
+        print("Invalid choice. Please enter A, M or I.")
+
+
+def display_check_results(title: str, results: list[tuple[str, bool, str]]) -> None:
+    """
+    Renders a pass/fail report, e.g. for the automated test suite.
+    results: (check name, passed, failure detail) tuples.
+    """
+    line = "=" * 60
+    print("\n" + line)
+    print(title.upper())
+    print(line)
+    for name, passed, detail in results:
+        print(f"[{'PASS' if passed else 'FAIL'}] {name}")
+        if not passed and detail:
+            print(detail.rstrip())
+    passed_count = sum(1 for _, passed, _ in results if passed)
+    print(line)
+    print(f"Results: {passed_count}/{len(results)} tests passed.")
+    print(line)
+
+
 def prompt_continue() -> None:
     """
     Pauses output until user presses Enter.
