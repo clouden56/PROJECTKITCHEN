@@ -7,7 +7,7 @@ Constraints: 100% procedural (NO classes).
 IMPORTANT: ALL print() calls in the entire application reside in this module and nowhere else.
 """
 
-import sys
+import math
 from datetime import datetime
 
 
@@ -96,6 +96,9 @@ def prompt_positive_number(label: str, is_float: bool = False) -> float | int:
         raw = input(f"{label}: ").strip()
         try:
             val = float(raw) if is_float else int(raw)
+            if not math.isfinite(val):
+                print("Number must be a finite value.")
+                continue
             if val > 0:
                 return val
             print("Number must be strictly greater than 0.")
