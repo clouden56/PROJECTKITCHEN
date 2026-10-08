@@ -1,5 +1,7 @@
 # Fridge Recipe Tracker (PROJECTKITCHEN)
 
+[![CI](https://github.com/clouden56/PROJECTKITCHEN/actions/workflows/ci.yml/badge.svg)](https://github.com/clouden56/PROJECTKITCHEN/actions/workflows/ci.yml)
+
 An AI-powered recipe suggestion and food-waste prevention system built for **INF1009 Programming Fundamentals (Team Project)**.
 
 ---
@@ -66,6 +68,7 @@ GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
 ### 3. Install Dependencies
+No third-party packages are required (standard library only); this step is a no-op kept for convention.
 ```bash
 pip install -r requirements.txt
 ```
@@ -79,12 +82,41 @@ python main.py
 ```bash
 python tests/test_pipeline.py
 ```
-This runs 5 automated procedural test suites:
-1. `test_zero_classes_in_codebase`: Scans all `.py` files to ensure zero class keywords.
-2. `test_no_prints_outside_io_manager`: Scans all modules to ensure zero `print()` calls outside `io_manager`.
-3. `test_data_manager_operations`: Tests saving, loading, queries, and corrupt-file fallback.
-4. `test_ai_manager_schema_validation`: Tests schema validation for valid and malformed payloads.
-5. `test_logic_manager_rules`: Tests allergen filters, expiry scoring, and multi-condition outcomes.
+The suite runs **fully offline**: no API key and no network are needed. It uses hardcoded sample Gemini responses from [tests/sample_ai_responses.py](tests/sample_ai_responses.py) and swaps the network call and `input()` for scripted stand-ins. It contains 12 procedural tests:
+
+| # | Test | Covers |
+|---|------|--------|
+| 1 | `test_zero_classes_in_codebase` | No `class` definitions anywhere |
+| 2 | `test_no_prints_outside_io_manager` | `print()` only in `io_manager` |
+| 3 | `test_data_manager_operations` | Save/load, queries, corrupt-file fallback |
+| 4 | `test_ai_manager_schema_validation` | Schema accepts valid / rejects malformed payloads |
+| 5 | `test_logic_manager_rules` | Allergen gate, expiry scoring, multi-condition outcomes |
+| 6 | `test_logic_manager_with_sample_ai_responses` | Sample AI responses → every ACCEPTED / FLAGGED / REJECTED branch |
+| 7 | `test_logic_manager_helper_functions` | Expiry maths, fuzzy matching, staples, unit conversion |
+| 8 | `test_ai_manager_rejects_malformed_responses` | 9 malformed envelopes rejected without exceptions |
+| 9 | `test_ai_pipeline_offline_failure_handling` | Network down, timeout, invalid key, 404 cascade, 429 retry |
+| 10 | `test_data_manager_corrupt_and_unwritable_files` | Corrupt-file quarantine, atomic saves, write failures |
+| 11 | `test_io_manager_reprompts_invalid_input` | Every prompt re-asks on invalid input |
+| 12 | `test_end_to_end_pipeline_offline` | Real CLI driven by scripted keystrokes through to the JSON files |
+
+---
+
+## 📄 Engineering Report
+
+[docs/Engineering_Report.pdf](docs/Engineering_Report.pdf) (5 pages) contains the architecture, the **data flow diagram** (user input → AI payload → file storage) and the **exception handling matrix**. It is rendered from [docs/report/engineering_report.html](docs/report/engineering_report.html); to regenerate it after editing:
+```powershell
+& "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe" --headless=new --no-pdf-header-footer --print-to-pdf="$PWD\docs\Engineering_Report.pdf" "$PWD\docs\report\engineering_report.html"
+```
+
+---
+
+## 🔁 Continuous Integration
+
+[.github/workflows/ci.yml](.github/workflows/ci.yml) runs on every push and on every pull request into `main`:
+1. **Lint & test** on Python 3.10 and 3.12: `ruff` (syntax errors and undefined names), byte-compile, then the offline test suite.
+2. **Docker**: builds the image, runs the test suite inside the container, and smoke-tests the CLI.
+
+Workflow: branch from `main` → small, descriptive commits → open a pull request → merge once CI is green.
 
 ---
 
@@ -110,7 +142,16 @@ docker build -t projectkitchen .
 # 2. Run the interactive terminal app (with mounted persistent data):
 docker run --rm -it -v "$(pwd)/data:/app/data" -e GEMINI_API_KEY="your_api_key" projectkitchen
 
-# 3. Run the automated test suite in container:
-docker run --rm -e GEMINI_API_KEY="your_api_key" projectkitchen python tests/test_pipeline.py
+# 3. Run the automated test suite in container (no API key needed):
+docker run --rm projectkitchen python tests/test_pipeline.py
+```
+
+---
+
+## 📦 Submission Packaging (Part 1)
+
+Builds `dist/[LabGroup]_[TeamNumber]_ProjectPart1Final.zip` with the five required folders: Engineering Report, Project Code, Test Script, Git Repository History, and Docker image. Commit your work first, because the code is exported from `HEAD`. Docker Desktop must be running.
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/package_submission.ps1 -LabGroup P1 -TeamNumber 07
 ```
 
