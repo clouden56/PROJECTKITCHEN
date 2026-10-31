@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Not found · Fridge Recipe Tracker{% endblock %}
+{% block content %}
+<section class="card narrow center">
+  <h1>Page not found</h1>
+  <p class="muted">That page or recipe doesn't exist. It may have been removed from your history.</p>
+  <a class="button button-primary" href="{{ url_for('dashboard') }}">Back to the dashboard</a>
+</section>
+{% endblock %}

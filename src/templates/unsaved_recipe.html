@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% from "_macros.html" import outcome_badge with context %}
+{% block title %}{{ record.recipe.name }} · Fridge Recipe Tracker{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>{{ record.recipe.name }}</h1>
+    <p class="muted">Not saved to your history &middot; {{ record.recipe.meal_type }} &middot; {{ record.recipe.cook_time_mins }} mins</p>
+  </div>
+  {{ outcome_badge(record.evaluation.outcome) }}
+</div>
+<p class="verdict-message">{{ record.evaluation.status_message }}</p>
+{% set recipe = record.recipe %}
+{% include "_recipe_body.html" %}
+{% endblock %}

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% from "_macros.html" import expiry_badge, field_error with context %}
+{% block title %}Inventory · Fridge Recipe Tracker{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Inventory</h1>
+  <div class="segmented" role="group" aria-label="Show">
+    <a href="{{ url_for('inventory') }}" class="{{ 'active' if not expiring_only }}">All items</a>
+    <a href="{{ url_for('inventory', view='expiring') }}" class="{{ 'active' if expiring_only }}">Expiring soon</a>
+  </div>
+</div>
+
+<div class="grid-sidebar">
+  <section class="card">
+    {% if items %}
+      <div class="table-scroll">
+        <table class="table">
+          <thead><tr><th>Item</th><th>Quantity</th><th>Where</th><th>Expiry</th><th><span class="sr-only">Actions</span></th></tr></thead>
+          <tbody>
+            {% for item in items %}
+              <tr>
+                <td><strong>{{ item.name }}</strong></td>
+                <td>{{ io.format_quantity(item.quantity, item.unit) }}</td>
+                <td>{{ item.location }}</td>
+                <td>{{ expiry_badge(item) }}
+                  {% if item.expiry_date %}<span class="muted small">{{ item.expiry_date.strftime('%d %b %Y') }}</span>{% endif %}</td>
+                <td class="actions">
+                  <form method="post" action="{{ url_for('remove_ingredient') }}" data-confirm="Remove {{ item.name }}?">
+                    <input type="hidden" name="name" value="{{ item.name }}">
+                    <button type="submit" class="button button-quiet">Remove</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% elif expiring_only %}
+      <p class="empty">Nothing expires in the next 3 days.</p>
+    {% else %}
+      <p class="empty">Your inventory is empty. Add what is in your fridge and pantry.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>Add or restock an item</h2>
+    <p class="muted small">Adding a name that already exists updates its quantity and expiry.</p>
+    <form method="post" action="{{ url_for('add_ingredient') }}" class="form" novalidate>
+      <label for="name">Ingredient</label>
+      <input id="name" name="name" value="{{ form.get('name', '') }}" maxlength="60" placeholder="e.g. Spinach" required
+             {% if errors.name %}aria-invalid="true" aria-describedby="name-error"{% endif %}>
+      {{ field_error(errors, 'name') }}
+
+      <div class="row">
+        <div>
+          <label for="quantity">Quantity</label>
+          <input id="quantity" name="quantity" value="{{ form.get('quantity', '') }}" inputmode="decimal" required
+                 {% if errors.quantity %}aria-invalid="true" aria-describedby="quantity-error"{% endif %}>
+          {{ field_error(errors, 'quantity') }}
+        </div>
+        <div>
+          <label for="unit">Unit</label>
+          <input id="unit" name="unit" value="{{ form.get('unit', '') }}" maxlength="20" placeholder="g, ml, pcs" required
+                 {% if errors.unit %}aria-invalid="true" aria-describedby="unit-error"{% endif %}>
+          {{ field_error(errors, 'unit') }}
+        </div>
+      </div>
+
+      <label for="location">Stored in</label>
+      <select id="location" name="location">
+        {% for location in io.locations %}
+          <option {{ 'selected' if form.get('location', 'Fridge') == location }}>{{ location }}</option>
+        {% endfor %}
+      </select>
+      {{ field_error(errors, 'location') }}
+
+      <label for="expiry_date">Expiry date</label>
+      <input id="expiry_date" name="expiry_date" type="date" value="{{ form.get('expiry_date', '') }}" required
+             {% if errors.expiry_date %}aria-invalid="true" aria-describedby="expiry_date-error"{% endif %}>
+      {{ field_error(errors, 'expiry_date') }}
+
+      <button type="submit" class="button button-primary">Save item</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

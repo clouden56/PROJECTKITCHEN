@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% from "_macros.html" import field_error with context %}
+{% block title %}Suggest a recipe · Fridge Recipe Tracker{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Suggest a recipe</h1>
+</div>
+
+{% if problem %}
+  <div class="flash flash-error" role="alert">{{ problem }}</div>
+{% endif %}
+{% if inventory_count < minimum %}
+  <div class="flash flash-info">You have {{ inventory_count }} item{{ 's' if inventory_count != 1 }} recorded.
+    <a href="{{ url_for('inventory') }}">Add at least {{ minimum }}</a> so the AI has something to cook with.</div>
+{% endif %}
+
+<section class="card narrow">
+  <form method="post" action="{{ url_for('generate_recipe') }}" class="form" data-busy="Asking Gemini for a recipe... this can take up to a minute." novalidate>
+    <div class="row">
+      <div>
+        <label for="meal_type">Meal</label>
+        <select id="meal_type" name="meal_type">
+          {% for meal in io.meal_types %}
+            <option {{ 'selected' if form.get('meal_type') == meal }}>{{ meal }}</option>
+          {% endfor %}
+        </select>
+        {{ field_error(errors, 'meal_type') }}
+      </div>
+      <div>
+        <label for="max_cook_time_mins">Max cooking time (minutes)</label>
+        <input id="max_cook_time_mins" name="max_cook_time_mins" inputmode="numeric" value="{{ form.get('max_cook_time_mins', '') }}" required
+               {% if errors.max_cook_time_mins %}aria-invalid="true" aria-describedby="max_cook_time_mins-error"{% endif %}>
+        {{ field_error(errors, 'max_cook_time_mins') }}
+      </div>
+    </div>
+
+    <label for="allergies">Allergies or foods to avoid</label>
+    <input id="allergies" name="allergies" value="{{ form.get('allergies', '') }}" placeholder="e.g. peanuts, dairy"
+           {% if errors.allergies %}aria-invalid="true" aria-describedby="allergies-error"{% endif %}>
+    <p class="hint">Comma-separated. Common groups like dairy, nuts and gluten also catch their ingredients.</p>
+    {{ field_error(errors, 'allergies') }}
+
+    <label for="mandatory_ingredients">Must include</label>
+    <input id="mandatory_ingredients" name="mandatory_ingredients" value="{{ form.get('mandatory_ingredients', '') }}" placeholder="e.g. eggs, spinach"
+           {% if errors.mandatory_ingredients %}aria-invalid="true" aria-describedby="mandatory_ingredients-error"{% endif %}>
+    {{ field_error(errors, 'mandatory_ingredients') }}
+
+    <label for="notes">Cooking style <span class="muted">(optional)</span></label>
+    <input id="notes" name="notes" value="{{ form.get('notes', '') }}" maxlength="200" placeholder="e.g. one-pot, stir-fry">
+    {{ field_error(errors, 'notes') }}
+
+    <button type="submit" class="button button-primary">Suggest a recipe</button>
+    <p class="busy-message" aria-live="polite"></p>
+  </form>
+</section>
+{% endblock %}

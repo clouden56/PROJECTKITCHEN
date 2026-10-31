@@ -1,0 +1,12 @@
+{% macro outcome_badge(outcome) -%}
+  <span class="badge badge-{{ io.outcome_style(outcome) }}">{{ outcome.value }}</span>
+{%- endmacro %}
+
+{% macro expiry_badge(ingredient) -%}
+  {% set label, style = io.expiry_badge(ingredient, today) %}
+  <span class="pill pill-{{ style }}">{{ label }}</span>
+{%- endmacro %}
+
+{% macro field_error(errors, name) -%}
+  {% if errors.get(name) %}<p class="field-error" id="{{ name }}-error">{{ errors[name] }}</p>{% endif %}
+{%- endmacro %}
