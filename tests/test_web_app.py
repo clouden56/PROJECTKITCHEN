@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import tempfile
@@ -21,8 +22,8 @@ class WebTestCase(unittest.TestCase):
     def setUp(self):
         logging.disable(logging.CRITICAL)
         self._tmp = tempfile.TemporaryDirectory()
-        self.data = DataManager(os.path.join(self._tmp.name, "inventory.json"),
-                                os.path.join(self._tmp.name, "history.json"))
+        self.history_path = os.path.join(self._tmp.name, "history.json")
+        self.data = DataManager(os.path.join(self._tmp.name, "inventory.json"), self.history_path)
         self.data.save_inventory(SampleResponses.inventory(TODAY))
         self.ai_client = StubAIClient([SampleResponses.ACCEPTED])
         ai = RecipeAIManager(self.ai_client, ("model-a",), sleep=lambda _: None)
@@ -138,6 +139,58 @@ class RecipeGenerationTests(WebTestCase):
         self.assertIn("No saved recipes match", page)
         self.assertIn("Omelette", self.text(self.client.get("/history?meal_type=nonsense")),
                       "Unknown filter values are ignored")
+
+
+class RecipeDetailTests(WebTestCase):
+    """New feature: click a saved recipe to see it in full, re-checked against today's inventory."""
+
+    def saved_record_url(self) -> str:
+        response = self.generate()
+        self.assertEqual(response.status_code, 302)
+        return response.headers["Location"]
+
+    def test_new_recipe_opens_on_its_detail_page(self):
+        url = self.saved_record_url()
+        record = self.data.load()[0]
+        self.assertTrue(url.endswith(f"/history/{record.id}"))
+        page = self.text(self.client.get(url))
+        for expected in ("Spinach &amp; Cheddar Omelette", "Whisk the eggs.", "Add cheddar, fold and serve.",
+                         "Non-stick Skillet", "Can you still cook it today?", "Rule by rule", "Allergen safety",
+                         "None of your allergens (nuts) appear", "Rescued from expiry", "avoiding nuts"):
+            self.assertIn(expected, page)
+        self.assertIn("The verdict is unchanged", page)
+
+    def test_history_rows_link_to_details(self):
+        url = self.saved_record_url()
+        history = self.text(self.client.get("/history"))
+        self.assertIn(f'href="{url}"', history)
+        self.assertIn(f'href="{url}"', self.text(self.client.get("/")), "Dashboard links recent recipes too")
+
+    def test_detail_shows_verdict_change_after_ingredients_are_used_up(self):
+        url = self.saved_record_url()
+        for name in ("Eggs", "Cheddar Cheese", "Spinach"):
+            self.service.remove_ingredient(name)
+        page = self.text(self.client.get(url))
+        self.assertIn("The verdict has changed", page)
+        self.assertIn("from accepted to rejected", page)
+        self.assertIn("Used up since then", page)
+        self.assertIn("not in your kitchen", page)
+        self.assertIn("-100 since saved", page)
+
+    def test_unknown_record_is_404(self):
+        response = self.client.get("/history/does-not-exist")
+        self.assertEqual(response.status_code, 404)
+        self.assertIn("Page not found", self.text(response))
+
+    def test_phase1_record_without_request_still_opens(self):
+        with open(self.history_path, "w", encoding="utf-8") as f:
+            json.dump([{"created_at": "2026-09-22 17:38:01", "recipe": json.loads(SampleResponses.MISSING_SOME),
+                        "evaluation": {"outcome": "FLAGGED", "status_message": "Saved in Phase 1."}}], f)
+        record = self.data.load()[0]
+        page = self.text(self.client.get(f"/history/{record.id}"))
+        self.assertIn("French Toast", page)
+        self.assertIn("saved before requests were stored", page)
+        self.assertIn("Not recorded", page)
 
 
 if __name__ == "__main__":

@@ -43,7 +43,8 @@
     {% if recent %}
       <ul class="item-list">
         {% for record in recent %}
-          <li><span>{{ record.recipe.name }} <span class="muted">{{ record.created_at.strftime('%d %b') }}</span></span>
+          <li><span><a href="{{ url_for('history_detail', record_id=record.id) }}">{{ record.recipe.name }}</a>
+            <span class="muted">{{ record.created_at.strftime('%d %b') }}</span></span>
             {{ outcome_badge(record.evaluation.outcome) }}</li>
         {% endfor %}
       </ul>

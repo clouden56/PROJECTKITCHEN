@@ -7,7 +7,7 @@
       {% for ingredient in recipe.ingredients_used %}
         {% if owned is defined and ingredient not in owned %}
           <li class="missing"><span class="mark" aria-hidden="true">&times;</span>{{ ingredient }}
-            <span class="sr-only">(no longer in your kitchen)</span><span class="muted small">no longer in stock</span></li>
+            <span class="muted small">not in your kitchen</span></li>
         {% else %}
           <li><span class="mark" aria-hidden="true">&check;</span>{{ ingredient }}</li>
         {% endif %}

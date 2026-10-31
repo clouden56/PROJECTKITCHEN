@@ -12,7 +12,9 @@ from typing import Callable
 from src.ai_manager import AIManager
 from src.data_manager import AllFilters, DataManager, RecordFilter
 from src.logic_manager import LogicManager
-from src.models import Evaluation, HistoryRecord, Ingredient, Inventory, Outcome, Recipe, RecipeJob, RecipeRequest
+from src.models import (
+    Evaluation, HistoryRecord, Ingredient, Inventory, Outcome, Recipe, RecipeJob, RecipeRequest, RuleResult,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +91,11 @@ class RecordComparison:
     @property
     def match_change(self) -> int:
         return self._current.match_percentage - self.saved.match_percentage
+
+    def rule_changes(self) -> list[tuple[str, RuleResult | None, RuleResult]]:
+        """(rule name, result when saved or None for Phase 1 records, result today) for every rule."""
+        saved = {result.rule_name: result for result in self.saved.rule_results}
+        return [(result.rule_name, saved.get(result.rule_name), result) for result in self._current.rule_results]
 
 
 class KitchenService:

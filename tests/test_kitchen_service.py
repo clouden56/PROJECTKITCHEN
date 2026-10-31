@@ -109,6 +109,15 @@ class RecordComparisonTests(ServiceTestCase):
         self.assertEqual(len(comparison.newly_missing), 3)
         self.assertEqual(comparison.match_change, -100)
 
+    def test_rule_changes_pair_saved_and_current_results(self):
+        record = self.service.generate_recipe(RecipeRequest("Breakfast", 20))
+        self.service.remove_ingredient("Spinach")
+        changes = self.service.compare_with_current(record.id).rule_changes()
+        self.assertEqual([name for name, _, _ in changes][:2], ["Allergen safety", "Ingredient match"])
+        shopping = dict((name, (then, now)) for name, then, now in changes)["Shopping needed"]
+        self.assertTrue(shopping[0].passed)
+        self.assertFalse(shopping[1].passed, "Spinach must now be bought")
+
     def test_unknown_record(self):
         with self.assertRaises(RecordNotFoundError):
             self.service.compare_with_current("nope")

@@ -37,7 +37,7 @@
   <ul class="record-list">
     {% for record in records %}
       <li class="record">
-        <div class="record-body">
+        <a class="record-body" href="{{ url_for('history_detail', record_id=record.id) }}">
           <div class="record-main">
             <h2 class="record-title">{{ record.recipe.name }}</h2>
             <p class="muted small">{{ record.recipe.meal_type }} &middot; {{ record.recipe.cook_time_mins }} mins
@@ -47,7 +47,7 @@
             <span class="muted small">{{ record.evaluation.match_percentage }}% match</span>
             {{ outcome_badge(record.evaluation.outcome) }}
           </div>
-        </div>
+        </a>
       </li>
     {% endfor %}
   </ul>

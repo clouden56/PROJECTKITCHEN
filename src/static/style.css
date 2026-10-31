@@ -45,7 +45,7 @@ h3 { font-size: 0.95rem; margin-top: 1.25rem; }
 .center { text-align: center; margin-left: auto; margin-right: auto; }
 .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; }
 .grid-sidebar { display: grid; grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); gap: 1rem; align-items: start; }
-@media (max-width: 800px) { .grid-sidebar { grid-template-columns: 1fr; } }
+@media (max-width: 800px) { .grid-sidebar { grid-template-columns: minmax(0, 1fr); } }
 .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
 .empty { color: var(--muted); margin: 0; }
 
@@ -124,3 +124,22 @@ a.record-body:hover { border-color: var(--accent); }
 .steps { padding-left: 1.25rem; margin: 0; }
 .steps li { margin-bottom: 0.6rem; }
 .tip { background: var(--accent-soft); border-radius: 8px; padding: 0.75rem 1rem; margin: 1rem 0 0; }
+
+.breadcrumb { margin: 0 0 0.75rem; }
+.breadcrumb a { text-decoration: none; font-weight: 500; }
+.verdict-stack { display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem; }
+.today-check { border-left: 4px solid var(--accent); }
+.today-flagged { border-left-color: var(--warn); }
+.today-rejected { border-left-color: var(--danger); }
+.today-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.today-head h2 { margin: 0; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; margin: 1rem 0; }
+.facts dt { color: var(--muted); font-size: 0.85rem; }
+.facts dd { margin: 0; font-size: 1.25rem; font-weight: 700; }
+.delta { display: block; font-size: 0.8rem; font-weight: 600; }
+.delta.up { color: var(--accent); }
+.delta.down { color: var(--danger); }
+.rules td .muted.small { display: block; font-weight: 400; }
+.result { font-weight: 700; font-size: 0.85rem; white-space: nowrap; }
+.result.pass { color: var(--accent); }
+.result.fail { color: var(--danger); }

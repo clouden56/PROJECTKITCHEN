@@ -14,7 +14,7 @@ from flask import Flask, flash, redirect, render_template, request, url_for
 from src.ai_manager import AIProcessingError
 from src.io_manager import IOManager
 from src.kitchen_service import (
-    IngredientNotFoundError, InsufficientInventoryError, KitchenService, StorageError,
+    IngredientNotFoundError, InsufficientInventoryError, KitchenService, RecordNotFoundError, StorageError,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,6 +53,7 @@ class WebApp:
             ("/recipes/new", "new_recipe", self.new_recipe, ("GET",)),
             ("/recipes", "generate_recipe", self.generate_recipe, ("POST",)),
             ("/history", "history", self.history, ("GET",)),
+            ("/history/<record_id>", "history_detail", self.history_detail, ("GET",)),
             ("/health", "health", self.health, ("GET",)),
         )
         for rule, endpoint, view, methods in routes:
@@ -111,12 +112,20 @@ class WebApp:
             flash(str(err), "error")
             return render_template("unsaved_recipe.html", record=err.record), 500
         flash(f"Your recipe is ready: {record.recipe.name}.", "success")
-        return redirect(url_for("history"))
+        return redirect(url_for("history_detail", record_id=record.id))
 
     def history(self):
         record_filter, selected = self._io.parse_history_filter(request.args)
         return render_template("history.html", records=self._service.history(record_filter), selected=selected,
                                filtered=any(selected.values()))
+
+    def history_detail(self, record_id: str):
+        try:
+            comparison = self._service.compare_with_current(record_id)
+        except RecordNotFoundError:
+            return self.not_found(None)
+        return render_template("recipe_detail.html", comparison=comparison, record=comparison.record,
+                               owned=set(comparison.current.matched_ingredients))
 
     def health(self):
         return {"status": "ok"}
