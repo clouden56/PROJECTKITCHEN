@@ -14,3 +14,9 @@ venv/
 .DS_Store
 Thumbs.db
 
+data/app.log
+data/*.bak
+data/*.tmp
+dist/
+docs/
+*.pdf

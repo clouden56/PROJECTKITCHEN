@@ -1,3 +1,2 @@
-# Core dependencies
-python-dotenv>=1.0.0
-
+# No third-party runtime dependencies: the application uses only the Python standard library
+# (urllib for the Gemini REST API, json for flat-file storage, and a built-in .env loader).

@@ -19,7 +19,6 @@ services:
       dockerfile: Dockerfile
     image: projectkitchen:latest
     container_name: fridge_recipe_tracker_test
-    env_file:
-      - .env
+    # Deliberately no env_file / API key: the suite must pass fully offline
     command: ["python", "tests/test_pipeline.py"]
 
