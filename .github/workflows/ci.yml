@@ -23,6 +23,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
 
       - name: Install dependencies
         run: |
@@ -30,19 +31,16 @@ jobs:
           pip install -r requirements.txt
           pip install ruff
 
-      - name: Lint (syntax errors & undefined names)
-        run: ruff check --select E9,F63,F7,F82 .
-
-      - name: Compile check
-        run: python -m compileall -q main.py src tests
+      - name: Lint (syntax errors, undefined names, unused imports and variables)
+        run: ruff check --select E9,F .
 
       - name: Run offline test suite (no API key provided)
         env:
           GEMINI_API_KEY: ""
-        run: python tests/test_pipeline.py
+        run: python -m unittest discover -s tests -t . -v
 
   docker:
-    name: Docker build & containerised tests
+    name: Docker build, containerised tests & web smoke test
     runs-on: ubuntu-latest
     needs: lint-and-test
     steps:
@@ -52,7 +50,19 @@ jobs:
         run: docker build -t projectkitchen:ci .
 
       - name: Run test suite inside container
-        run: docker run --rm projectkitchen:ci python tests/test_pipeline.py
+        run: docker run --rm projectkitchen:ci python -m unittest discover -s tests -t .
 
-      - name: Smoke test CLI starts and exits cleanly
-        run: printf '1\n\n7\n' | docker run --rm -i projectkitchen:ci
+      - name: Start web app and check the pages respond
+        run: |
+          docker run -d --name web -p 5000:5000 projectkitchen:ci
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:5000/health && break
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:5000/ | grep -q "Fridge Recipe Tracker"
+          curl -fsS http://127.0.0.1:5000/history | grep -q "Recipe history"
+          curl -fsS http://127.0.0.1:5000/recipes/new | grep -q "Suggest a recipe"
+
+      - name: Show container logs on failure
+        if: failure()
+        run: docker logs web || true
