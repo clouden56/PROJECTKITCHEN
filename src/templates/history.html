@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% from "_macros.html" import outcome_badge with context %}
+{% block title %}History · Fridge Recipe Tracker{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Recipe history</h1>
+  <a class="button" href="{{ url_for('new_recipe') }}">Suggest another</a>
+</div>
+
+<form method="get" action="{{ url_for('history') }}" class="card filters">
+  <div>
+    <label for="meal_type">Meal</label>
+    <select id="meal_type" name="meal_type">
+      <option value="">Any meal</option>
+      {% for meal in io.meal_types %}<option {{ 'selected' if selected.meal_type == meal }}>{{ meal }}</option>{% endfor %}
+    </select>
+  </div>
+  <div>
+    <label for="ingredient">Uses ingredient</label>
+    <input id="ingredient" name="ingredient" value="{{ selected.ingredient }}" placeholder="e.g. egg">
+  </div>
+  <div>
+    <label for="outcome">Verdict</label>
+    <select id="outcome" name="outcome">
+      <option value="">Any verdict</option>
+      {% for outcome in io.outcomes %}<option {{ 'selected' if selected.outcome == outcome }}>{{ outcome }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="filter-actions">
+    <button type="submit" class="button button-primary">Filter</button>
+    {% if filtered %}<a href="{{ url_for('history') }}" class="button button-quiet">Clear</a>{% endif %}
+  </div>
+</form>
+
+{% if records %}
+  <p class="muted small">{{ records|length }} recipe{{ 's' if records|length != 1 }}{{ ' match your filters' if filtered }}.</p>
+  <ul class="record-list">
+    {% for record in records %}
+      <li class="record">
+        <a class="record-body" href="{{ url_for('history_detail', record_id=record.id) }}">
+          <div class="record-main">
+            <h2 class="record-title">{{ record.recipe.name }}</h2>
+            <p class="muted small">{{ record.recipe.meal_type }} &middot; {{ record.recipe.cook_time_mins }} mins
+              &middot; {{ record.created_at.strftime('%d %b %Y, %H:%M') }}</p>
+          </div>
+          <div class="record-meta">
+            <span class="muted small">{{ record.evaluation.match_percentage }}% match</span>
+            {{ outcome_badge(record.evaluation.outcome) }}
+          </div>
+        </a>
+      </li>
+    {% endfor %}
+  </ul>
+{% elif filtered %}
+  <p class="empty card">No saved recipes match these filters.</p>
+{% else %}
+  <p class="empty card">No recipes yet. <a href="{{ url_for('new_recipe') }}">Ask for your first one.</a></p>
+{% endif %}
+{% endblock %}

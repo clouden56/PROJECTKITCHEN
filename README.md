@@ -2,156 +2,161 @@
 
 [![CI](https://github.com/clouden56/PROJECTKITCHEN/actions/workflows/ci.yml/badge.svg)](https://github.com/clouden56/PROJECTKITCHEN/actions/workflows/ci.yml)
 
-An AI-powered recipe suggestion and food-waste prevention system built for **INF1103 Programming Fundamentals (Team Project)**.
+A web app that suggests recipes from what is already in your fridge and pantry, prioritising the food closest to
+expiry. Built for **INF1103 Programming Fundamentals**, Team Project Phase 2 (object-oriented refactor and extension).
 
----
+## The problem
 
-## 📌 Problem Statement
+Households throw away food that was forgotten until it expired, then spend more on groceries or takeaway, and face the
+daily "what can I cook?" question. Fridge Recipe Tracker records each item with its expiry date and asks Google Gemini
+for a recipe that uses the most urgent items first. The AI's answer is never trusted blindly: a set of business rules
+checks every recipe for allergens, missing ingredients, must-have ingredients and cooking time before you see it.
 
-Every week, households discard large amounts of untouched or forgotten food due to expiration, causing:
-1. **Food Wastage**: Ingredients rot before use.
-2. **Unnecessary Grocery Spending**: Buying duplicates or takeaway instead of utilizing existing items.
-3. **Decision Fatigue**: Difficulty figuring out what meals can be cooked with remaining ingredients.
+## Features
 
-**Fridge Recipe Tracker** acts as a kitchen co-pilot: it tracks your fridge and pantry inventory alongside expiration dates, and uses **Google Gemini AI** to craft tailored recipes that prioritize soon-to-expire ingredients, match meal constraints, and calculate waste diversion metrics.
+| Feature | Where |
+|---|---|
+| Track fridge and pantry items with expiry badges; filter to items expiring within 3 days | **Inventory** page |
+| Ask Gemini for a recipe (meal, time limit, allergies, must-include ingredients, cooking style) | **Suggest a recipe** |
+| Every suggestion is routed to **ACCEPTED**, **FLAGGED** or **REJECTED**, with an expiry-priority score and grams of food saved | Recipe page |
+| Search saved recipes by meal, ingredient or verdict | **History** |
+| **New in Phase 2: recipe detail view.** Click any saved recipe to see it in full (ingredients, shopping list, equipment, numbered steps, waste impact), plus a re-check against **today's** inventory: can you still cook it, has the verdict changed, what has been used up since, and how every rule scored then vs now | **History → click a recipe** |
+| **Advanced deliverable: web GUI** (Flask) replacing the Phase 1 terminal menu | Whole app |
 
----
+### New feature: recipe detail and re-check
 
-## 🏛️ 4-Layer Architectural Design
+- **Problem it solves:** a saved recipe was just a line in a list, and its verdict went stale as the fridge changed.
+- **How to use it:** on the History page or the dashboard, click a recipe. A newly generated recipe opens on this page automatically.
+- **Classes involved:**
+  - `KitchenService.compare_with_current()` re-runs the same `LogicManager` rules on the saved recipe with today's inventory.
+  - `RecordComparison` works out what changed.
+  - `WebApp.history_detail()` and `recipe_detail.html` display it.
+  - Recipes saved in Phase 1 (before requests were stored) are re-checked with an inferred request.
+- **Tests:** `RecordComparisonTests` in [tests/test_kitchen_service.py](tests/test_kitchen_service.py) and `RecipeDetailTests` in [tests/test_web_app.py](tests/test_web_app.py).
 
-The project strictly follows the 4-layer architecture required by the specification:
+## Architecture
 
-```text
-User / Terminal
-       ↓
-  io_manager.py      [Input/Output Layer]  (ALL print() and terminal input calls live here)
-       ↓
-  ai_manager.py      [AI Processing Layer] (Gemini API calls & strict JSON schema validation)
-       ↓
- logic_manager.py    [Logic Layer]         (Domain brain: multi-condition rules & allergen gate)
-       ↓
- data_manager.py     [Data Layer]          (Flat-file JSON persistence, queries & fault-resilience)
+The four Phase 1 manager responsibilities are kept, each now a set of classes:
+
+| Layer | File | Responsibility | Main classes |
+|---|---|---|---|
+| IO | [src/io_manager.py](src/io_manager.py), [src/web_app.py](src/web_app.py), `src/templates/` | Validate user input into typed objects; route HTTP; display results | `IOManager`, `Form`, `FormField` subclasses, `WebApp` |
+| AI | [src/ai_manager.py](src/ai_manager.py) | `build_prompt` → `call_api` → `parse_response` → `validate_response` for **every** request; retries and model fallback | `AIClient` (interface), `GeminiClient`, `AIManager` (abstract), `RecipeAIManager` |
+| Logic | [src/logic_manager.py](src/logic_manager.py) | Business rules on AI output: `evaluate`, `score`, `route` | `LogicManager`, `BusinessRule` → `RejectionRule`/`WarningRule` → five rules |
+| Data | [src/data_manager.py](src/data_manager.py) | JSON persistence (`save`, `load`, `query`); survives missing/corrupt files | `Repository` (interface), `JsonRepository`, `DataManager`, `RecordFilter` |
+
+Supporting modules:
+- **[src/models.py](src/models.py):** the domain objects (`Ingredient`, `Inventory`, `Recipe`, `Evaluation`, `HistoryRecord`, and so on).
+- **[src/kitchen_service.py](src/kitchen_service.py):** runs each use case through the managers in order.
+- **[main.py](main.py):** `Application` builds everything once at start-up.
+
+**UML class diagrams, OOP concept mapping and SOLID evidence:** [docs/uml/README.md](docs/uml/README.md)
+
+```mermaid
+classDiagram
+  direction LR
+  WebApp --> IOManager
+  WebApp --> KitchenService
+  KitchenService --> AIManager
+  KitchenService --> LogicManager
+  KitchenService --> DataManager
+  AIManager <|-- RecipeAIManager
+  AIManager --> AIClient
+  AIClient <|.. GeminiClient
+  LogicManager o-- BusinessRule
+  DataManager *-- InventoryRepository
+  DataManager *-- HistoryRepository
 ```
 
-### Module Responsibilities & Hard Constraints
+## Quick start
 
-| Module | Architectural Role | Constraints & Features |
-| :--- | :--- | :--- |
-| **`src/io_manager.py`** | **Input Layer** | • Collects structured terminal inputs.<br>• Re-prompts on invalid data (e.g. invalid date formats, non-numeric cook times).<br>• **Every `print()` and `input()` call in the codebase lives here and nowhere else** (enforced by a grep-strict test).<br>• Returns typed dicts (`prompt_recipe_generation_criteria`, `prompt_new_ingredient`, `prompt_history_filter`).<br>• Formats tables, recipe cards, and warning banners. |
-| **`src/ai_manager.py`** | **AI Processing Layer** | • **Zero domain logic** (purely handles LLM interaction).<br>• Framework API: `build_prompt(record)`, `call_api(prompt)`, `parse_response(raw)`, `validate_response(data)`, orchestrated by `process(record)`.<br>• Requests JSON output (temperature 0 for repeatable results) and validates the schema strictly; logs and retries with model cascades (`gemini-3.6-flash`, `gemini-flash-latest`, `gemini-2.5-flash-lite`).<br>• Never crashes on network or API failures. |
-| **`src/logic_manager.py`** | **Logic Layer (Domain Brain)** | • **Allergen & Safety Gate**: Rejects recipes containing user allergens or synonyms.<br>• **Expiry Priority Scoring**: Rewards recipes that consume ingredients expiring in $\le 3$ days.<br>• Framework API: `evaluate(record)`, `score(record)`, `route(evaluation)`.<br>• **Multi-Condition Decision Rule** (`route`): Determines outcome (`ACCEPTED`, `FLAGGED`, `REJECTED`) based on allergen safety, ingredient match ratio ($\ge 50\%$), and cook time limits.<br>• **Waste Impact Calculation**: Estimates grams of food diverted from disposal. |
-| **`src/data_manager.py`** | **Data Layer** | • Framework API: `save(record)`, `load()` (called on startup), `query(filter_fn)` with filter builders `meal_type_filter` / `ingredient_filter`.<br>• Persists inventory and evaluated recipes to flat JSON files (`data/`); `query_items_by_expiry` finds urgent items.<br>• Handles missing, empty, or corrupt files gracefully without crashing. |
-| **`main.py`** | **Application Coordinator** | • Orchestrates pipeline flow between the four managers with 100% procedural functions and zero `print()` statements. |
+### With Docker (recommended)
 
----
-
-## 🔒 Hard Constraints Compliance
-
-* **100% Procedural**: There are **zero `class` definitions** across the entire codebase (including the test suite). Verified via automated static scanning (`re.compile(r"^\s*class\s+")`).
-* **AI as Core Engine**: Every recipe suggestion passes directly through the Gemini API.
-* **Structured API Responses**: Gemini returns strictly valid JSON adhering to a validated schema.
-* **Flat File Persistence**: Data is persisted in `data/inventory.json` and `data/recipe_history.json`.
-* **Print Localization**: Only `src/io_manager.py` contains `print()` calls.
-
----
-
-## 🚀 Setup & Execution
-
-### 1. Prerequisites
-- Python 3.10+ (tested on Python 3.12 / 3.14)
-- (Optional) Docker
-
-### 2. Environment Configuration
-Create a `.env` file in the root directory (or set your environment variable):
 ```bash
-GEMINI_API_KEY=your_gemini_api_key_here
+cp .env.example .env            # then put your GEMINI_API_KEY in .env
+docker compose up --build app   # open http://localhost:5000
+docker compose run --rm test    # run the test suite in the container (no API key needed)
 ```
 
-### 3. Install Dependencies
-No third-party packages are required (standard library only); this step is a no-op kept for convention.
+`./data` is mounted into the container, so the inventory and history persist between runs.
+
+### Without Docker
+
+Requires Python 3.10 or newer.
+
 ```bash
 pip install -r requirements.txt
+python main.py                  # open http://127.0.0.1:5000
 ```
 
-### 4. Run Application
+### Configuration
+
+All settings come from environment variables or a git-ignored `.env` file; see [.env.example](.env.example).
+**Never commit `.env` or an API key.**
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `GEMINI_API_KEY` | (none) | Required to generate recipes; get one from Google AI Studio |
+| `SECRET_KEY` | random per start | Signs flash messages |
+| `HOST` / `PORT` | `127.0.0.1` / `5000` | Where the web server listens (the Docker image uses `0.0.0.0`) |
+| `DATA_DIR` | `data` | Folder for `inventory.json`, `recipe_history.json` and `app.log` |
+| `GEMINI_MODELS` | `gemini-3.6-flash,gemini-flash-latest,gemini-2.5-flash-lite` | Model fallback order |
+
+## Tests
+
 ```bash
-python main.py
+python -m unittest discover -s tests -t . -v
 ```
 
-### 5. Run Automated Tests
-```bash
-python tests/test_pipeline.py
-```
-The suite runs **fully offline**: no API key and no network are needed. It uses hardcoded sample Gemini responses from [tests/sample_ai_responses.py](tests/sample_ai_responses.py) and swaps the network call and `input()` for scripted stand-ins. It contains 12 procedural tests:
+The suite runs **without a live AI API**: [tests/sample_ai_responses.py](tests/sample_ai_responses.py) holds hardcoded
+Gemini replies, and `StubAIClient` stands in for `GeminiClient` behind the `AIClient` interface.
 
-| # | Test | Covers |
-|---|------|--------|
-| 1 | `test_zero_classes_in_codebase` | No `class` definitions anywhere |
-| 2 | `test_no_prints_outside_io_manager` | `print(` / `input(` appear only in `io_manager` (grep-strict) |
-| 3 | `test_data_manager_operations` | Save/load, queries, corrupt-file fallback |
-| 4 | `test_ai_manager_schema_validation` | Schema accepts valid / rejects malformed payloads |
-| 5 | `test_logic_manager_rules` | Allergen gate, expiry scoring, multi-condition outcomes |
-| 6 | `test_logic_manager_with_sample_ai_responses` | Sample AI responses → every ACCEPTED / FLAGGED / REJECTED branch |
-| 7 | `test_logic_manager_helper_functions` | Expiry maths, fuzzy matching, staples, unit conversion |
-| 8 | `test_ai_manager_rejects_malformed_responses` | 9 malformed envelopes rejected without exceptions |
-| 9 | `test_ai_pipeline_offline_failure_handling` | Network down, timeout, invalid key, 404 cascade, 429 retry |
-| 10 | `test_data_manager_corrupt_and_unwritable_files` | Corrupt-file quarantine, atomic saves, write failures |
-| 11 | `test_io_manager_reprompts_bad_entries` | Every prompt re-asks on invalid input |
-| 12 | `test_end_to_end_pipeline_offline` | Real CLI driven by scripted keystrokes through to the JSON files |
+| File | Covers |
+|---|---|
+| `test_logic_manager.py` | Every ACCEPTED / FLAGGED / REJECTED branch from sample AI replies, exact scores, rule order, adding a rule without editing `LogicManager` (OCP), every rule substitutable (LSP) |
+| `test_ai_manager.py` | Prompt contents, schema validation of 9 malformed replies, retry/back-off, invalid key, model fallback, HTTP error mapping |
+| `test_data_manager.py` | Save/load, corrupt-file quarantine, invalid rows, write failures, history filters |
+| `test_io_manager.py` | Every form field's validation and display helpers |
+| `test_kitchen_service.py` | The full pipeline, AI and storage failures, the recipe re-check feature |
+| `test_web_app.py` | Every page end to end (Flask test client), including validation errors, AI outage, escaping, 404 and the detail page |
+| `test_models.py` | Domain object validation, encapsulation and serialisation, including Phase 1 records |
 
----
-
-## 📄 Engineering Report
-
-[docs/Engineering_Report.pdf](docs/Engineering_Report.pdf) (5 pages) contains the architecture, the **data flow diagram** (user input → AI payload → file storage) and the **exception handling matrix**. It is rendered from [docs/report/engineering_report.html](docs/report/engineering_report.html); to regenerate it after editing:
-```powershell
-& "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe" --headless=new --no-pdf-header-footer --print-to-pdf="$PWD\docs\Engineering_Report.pdf" "$PWD\docs\report\engineering_report.html"
-```
-
----
-
-## 🔁 Continuous Integration
+## Continuous integration
 
 [.github/workflows/ci.yml](.github/workflows/ci.yml) runs on every push and on every pull request into `main`:
-1. **Lint & test** on Python 3.10 and 3.12: `ruff` (syntax errors and undefined names), byte-compile, then the offline test suite.
-2. **Docker**: builds the image, runs the test suite inside the container, and smoke-tests the CLI.
 
-Workflow: branch from `main` → small, descriptive commits → open a pull request → merge once CI is green.
+1. **Lint and test** on Python 3.10 and 3.12: `ruff`, then the offline unittest suite.
+2. **Docker:** builds the image, runs the tests inside it, then starts the web app and checks the pages respond.
 
----
+Workflow: branch from `main` → small, descriptive commits → pull request → merge once CI is green.
 
-## 🐳 Docker Deployment
+## Project structure
 
-### Option A: Using Docker Compose (Recommended)
-Make sure your `.env` file contains your `GEMINI_API_KEY`.
-
-```bash
-# 1. Run the interactive application (with data persistence):
-docker compose run --rm app
-
-# 2. Run the automated test suite inside Docker:
-docker compose run --rm test
+```text
+main.py                  Application: composition root, starts the web server
+src/
+  models.py              domain objects
+  io_manager.py          form validation and display helpers
+  web_app.py             Flask routes
+  ai_manager.py          AI client interface, Gemini client, recipe AI manager
+  logic_manager.py       business rules, scoring and routing
+  data_manager.py        JSON repositories and history filters
+  kitchen_service.py     use cases across the four managers
+  config.py              settings from the environment / .env
+  templates/, static/    HTML templates, CSS and JS
+tests/                   unittest suites and sample AI responses
+docs/uml/                UML class diagrams (Mermaid source, SVG, PNG)
+docs/                    Phase 1 engineering report
+scripts/                 submission packaging
 ```
 
-### Option B: Using Standalone Docker Commands
+## Submission packaging (Part 2)
 
-```bash
-# 1. Build the Docker image
-docker build -t projectkitchen .
+The script below builds `dist/[LabGroup]_[TeamNumber]_ProjectPart2Final.zip` with the required folders. Before running it:
+- Commit your work, because the code is exported from `HEAD`.
+- Start Docker Desktop.
+- Put the Part 2 report at `docs/Engineering_Report_Part2.pdf`.
 
-# 2. Run the interactive terminal app (with mounted persistent data):
-docker run --rm -it -v "$(pwd)/data:/app/data" -e GEMINI_API_KEY="your_api_key" projectkitchen
-
-# 3. Run the automated test suite in container (no API key needed):
-docker run --rm projectkitchen python tests/test_pipeline.py
-```
-
----
-
-## 📦 Submission Packaging (Part 1)
-
-Builds `dist/[LabGroup]_[TeamNumber]_ProjectPart1Final.zip` with the five required folders: Engineering Report, Project Code, Test Script, Git Repository History, and Docker image. Commit your work first, because the code is exported from `HEAD`. Docker Desktop must be running.
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/package_submission.ps1 -LabGroup P1 -TeamNumber 07
+powershell -ExecutionPolicy Bypass -File scripts/package_submission.ps1 -LabGroup P1 -TeamNumber 07 -TeamAIdFile <path-to-TeamAId-export.csv>
 ```
-

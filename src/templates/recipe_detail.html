@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% from "_macros.html" import outcome_badge with context %}
+{% block title %}{{ record.recipe.name }} · Fridge Recipe Tracker{% endblock %}
+{% block content %}
+{% set saved = comparison.saved %}
+{% set current = comparison.current %}
+<p class="breadcrumb"><a href="{{ url_for('history') }}">&larr; All recipes</a></p>
+
+<div class="page-head">
+  <div>
+    <h1>{{ record.recipe.name }}</h1>
+    <p class="muted">{{ record.recipe.meal_type }} &middot; {{ record.recipe.cook_time_mins }} mins
+      &middot; suggested {{ record.created_at.strftime('%d %b %Y, %H:%M') }}</p>
+  </div>
+  <div class="verdict-stack">
+    <span class="muted small">Verdict when saved</span>
+    {{ outcome_badge(saved.outcome) }}
+  </div>
+</div>
+<p class="verdict-message">{{ saved.status_message }}</p>
+
+<section class="card today-check today-{{ io.outcome_style(current.outcome) }}" aria-labelledby="today-heading">
+  <div class="today-head">
+    <h2 id="today-heading">Can you still cook it today?</h2>
+    {{ outcome_badge(current.outcome) }}
+  </div>
+  {% if comparison.verdict_changed %}
+    <p><strong>The verdict has changed</strong> from {{ saved.outcome.value|lower }} to {{ current.outcome.value|lower }}
+      because your kitchen has changed since this recipe was suggested. {{ current.status_message }}</p>
+  {% else %}
+    <p>{{ 'Yes.' if comparison.still_cookable else 'No.' }} The verdict is unchanged: {{ current.status_message }}</p>
+  {% endif %}
+  <dl class="facts">
+    <div><dt>Ingredients in stock</dt>
+      <dd>{{ current.match_percentage }}%
+        {% if comparison.match_change > 0 %}<span class="delta up">+{{ comparison.match_change }} since saved</span>
+        {% elif comparison.match_change < 0 %}<span class="delta down">{{ comparison.match_change }} since saved</span>{% endif %}</dd></div>
+    <div><dt>Expiry priority today</dt><dd>{{ current.expiry_priority_score|round|int }} / 100</dd></div>
+    <div><dt>Food saved if cooked today</dt><dd>~{{ current.waste_diverted_grams }} g</dd></div>
+  </dl>
+  {% if comparison.newly_missing %}
+    <p class="small"><strong>Used up since then:</strong> {{ comparison.newly_missing|join(', ') }}</p>
+  {% endif %}
+  {% if comparison.request_inferred %}
+    <p class="muted small">This recipe was saved before requests were stored, so today's check assumes no allergies
+      and the recipe's own cooking time.</p>
+  {% endif %}
+</section>
+
+{% set recipe = record.recipe %}
+{% include "_recipe_body.html" %}
+
+<div class="grid-2">
+  <section class="card">
+    <h2>Rule by rule</h2>
+    <div class="table-scroll">
+      <table class="table rules">
+        <thead><tr><th>Rule</th><th>When saved</th><th>Today</th></tr></thead>
+        <tbody>
+          {% for name, then, now in comparison.rule_changes() %}
+            <tr>
+              <td><strong>{{ name }}</strong><span class="muted small">{{ now.message }}</span></td>
+              <td>{% if then is none %}<span class="muted">Not recorded</span>
+                  {% elif then.passed %}<span class="result pass">Passed</span>
+                  {% else %}<span class="result fail">Failed</span>{% endif %}</td>
+              <td>{% if now.passed %}<span class="result pass">Passed</span>
+                  {% else %}<span class="result fail">Failed</span>{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Waste impact when suggested</h2>
+    <dl class="facts">
+      <div><dt>Expiry priority</dt><dd>{{ saved.expiry_priority_score|round|int }} / 100</dd></div>
+      <div><dt>Food saved</dt><dd>~{{ saved.waste_diverted_grams }} g</dd></div>
+      <div><dt>Ingredient match</dt><dd>{{ saved.match_percentage }}%</dd></div>
+    </dl>
+    {% if saved.rescued_items %}
+      <h3>Rescued from expiry</h3>
+      <ul class="item-list">
+        {% for item in saved.rescued_items %}
+          <li><span>{{ item.name }} <span class="muted">{{ io.format_quantity(item.quantity, item.unit) }}</span></span>
+            <span class="pill {{ 'pill-today' if item.days_until_expiry <= 0 else 'pill-soon' if item.days_until_expiry <= 3 else 'pill-ok' }}">
+              {% if item.days_until_expiry < 0 %}expired{% elif item.days_until_expiry == 0 %}expired that day{% else %}{{ item.days_until_expiry }} day{{ 's' if item.days_until_expiry != 1 }} left{% endif %}</span></li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+    {% if record.request %}
+      <h3>Your request</h3>
+      <p class="small">{{ record.request.meal_type }}, up to {{ record.request.max_cook_time_mins }} mins
+        {%- if record.request.allergies %}, avoiding {{ record.request.allergies|join(', ') }}{% endif %}
+        {%- if record.request.mandatory_ingredients %}, must include {{ record.request.mandatory_ingredients|join(', ') }}{% endif %}
+        {%- if record.request.notes %}, style: {{ record.request.notes }}{% endif %}.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

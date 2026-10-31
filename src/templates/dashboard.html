@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% from "_macros.html" import expiry_badge, outcome_badge with context %}
+{% block content %}
+<section class="hero">
+  <div>
+    <h1>What can you cook before it goes off?</h1>
+    <p class="lede">Gemini suggests a recipe from your fridge and pantry, then our rules check it for allergens,
+      missing ingredients and cooking time before you see it.</p>
+  </div>
+  <a class="button button-primary" href="{{ url_for('new_recipe') }}">Suggest a recipe</a>
+</section>
+
+<section class="stats" aria-label="Summary">
+  <a class="stat" href="{{ url_for('inventory') }}">
+    <span class="stat-value">{{ inventory|length }}</span><span class="stat-label">items tracked</span>
+  </a>
+  <a class="stat {{ 'stat-warn' if expiring }}" href="{{ url_for('inventory', view='expiring') }}">
+    <span class="stat-value">{{ expiring|length }}</span><span class="stat-label">expiring within 3 days</span>
+  </a>
+  <a class="stat" href="{{ url_for('history') }}">
+    <span class="stat-value">{{ recent|length }}{% if recent|length == 5 %}+{% endif %}</span>
+    <span class="stat-label">recent recipes</span>
+  </a>
+</section>
+
+<div class="grid-2">
+  <section class="card">
+    <h2>Use these first</h2>
+    {% if expiring %}
+      <ul class="item-list">
+        {% for item in expiring %}
+          <li><span>{{ item.name }} <span class="muted">{{ io.format_quantity(item.quantity, item.unit) }}</span></span>
+            {{ expiry_badge(item) }}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="empty">Nothing expires in the next 3 days.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>Recent recipes</h2>
+    {% if recent %}
+      <ul class="item-list">
+        {% for record in recent %}
+          <li><span><a href="{{ url_for('history_detail', record_id=record.id) }}">{{ record.recipe.name }}</a>
+            <span class="muted">{{ record.created_at.strftime('%d %b') }}</span></span>
+            {{ outcome_badge(record.evaluation.outcome) }}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="empty">No recipes yet. <a href="{{ url_for('new_recipe') }}">Ask for your first one.</a></p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

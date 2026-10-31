@@ -1,0 +1,41 @@
+{# The recipe itself: ingredients, tools, steps and tip. Expects `recipe`; `owned` (optional) is the set of
+   ingredients currently in the kitchen. #}
+<div class="grid-2">
+  <section class="card">
+    <h2>Ingredients</h2>
+    <ul class="check-list">
+      {% for ingredient in recipe.ingredients_used %}
+        {% if owned is defined and ingredient not in owned %}
+          <li class="missing"><span class="mark" aria-hidden="true">&times;</span>{{ ingredient }}
+            <span class="muted small">not in your kitchen</span></li>
+        {% else %}
+          <li><span class="mark" aria-hidden="true">&check;</span>{{ ingredient }}</li>
+        {% endif %}
+      {% endfor %}
+    </ul>
+    {% if recipe.missing_ingredients %}
+      <h3>To buy</h3>
+      <ul class="check-list">
+        {% for ingredient in recipe.missing_ingredients %}
+          <li class="missing"><span class="mark" aria-hidden="true">+</span>{{ ingredient }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+    {% if recipe.required_tools %}
+      <h3>Equipment</h3>
+      <p>{{ recipe.required_tools|join(', ') }}</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>Method</h2>
+    <ol class="steps">
+      {% for step in recipe.steps %}
+        <li value="{{ step.number }}">{{ step.text }}</li>
+      {% endfor %}
+    </ol>
+    {% if recipe.waste_reduction_notes %}
+      <p class="tip"><strong>Waste tip:</strong> {{ recipe.waste_reduction_notes }}</p>
+    {% endif %}
+  </section>
+</div>
