@@ -1,380 +1,276 @@
 """
-I/O Manager Module
-Responsibility: All terminal user interfaces, structured user inputs, strict re-prompt validations,
-formatting of inventory tables, recipe cards, and summary reports.
-Architecture Layer: Input Layer
-Constraints: 100% procedural (NO classes).
-IMPORTANT: ALL print() calls in the entire application reside in this module and nowhere else.
+IO Manager - user input and output.
+
+Turns raw web form fields into validated, typed domain objects (never letting raw strings reach the other
+layers) and formats domain objects for display. Invalid input is reported field by field so the page can
+be shown again with the user's values and an explanation, instead of failing.
 """
 
+from __future__ import annotations
+
 import math
-from datetime import datetime
+from abc import ABC, abstractmethod
+from datetime import date, datetime
+from typing import Any, Generic, Iterable, Mapping, TypeVar
+
+from src.data_manager import AllFilters, IngredientFilter, MealTypeFilter, OutcomeFilter, RecordFilter
+from src.models import DATE_FORMAT, Ingredient, Outcome, RecipeRequest
+
+T = TypeVar("T")
 
 
-def print_banner(title: str) -> None:
-    """
-    Renders an ASCII styled header banner.
-    """
-    line = "=" * 65
-    print("\n" + line)
-    print(f"   {title.upper()}")
-    print(line)
+class FieldError(ValueError):
+    """A single form field holds an invalid value; the message is shown next to the field."""
 
 
-def print_divider() -> None:
-    """
-    Renders a subtle visual separator.
-    """
-    print("-" * 65)
+class FormField(ABC):
+    """One input field. clean() handles the shared required/blank logic; subclasses convert the text."""
+
+    def __init__(self, name: str, label: str, required: bool = True) -> None:
+        self._name = name
+        self._label = label
+        self._required = required
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def label(self) -> str:
+        return self._label
+
+    def clean(self, raw: Any) -> Any:
+        text = "" if raw is None else str(raw).strip()
+        if not text:
+            if self._required:
+                raise FieldError(f"{self._label} is required.")
+            return self.empty_value()
+        return self._convert(text)
+
+    def empty_value(self) -> Any:
+        return None
+
+    @abstractmethod
+    def _convert(self, text: str) -> Any:
+        """Converts non-blank text to the field's type, raising FieldError if it is invalid."""
 
 
-def display_message(message: str, level: str = "info") -> None:
-    """
-    Displays styled messages depending on level (info, success, warning, error).
-    """
-    prefix_map = {
-        "info": "[INFO]",
-        "success": "[SUCCESS]",
-        "warning": "[WARNING]",
-        "error": "[ERROR]"
-    }
-    prefix = prefix_map.get(level.lower(), "[INFO]")
-    print(f"\n{prefix} {message}")
+class TextField(FormField):
+    def __init__(self, name: str, label: str, max_length: int, required: bool = True) -> None:
+        super().__init__(name, label, required)
+        self._max_length = max_length
+
+    def empty_value(self) -> str:
+        return ""
+
+    def _convert(self, text: str) -> str:
+        if len(text) > self._max_length:
+            raise FieldError(f"{self._label} must be at most {self._max_length} characters.")
+        return text
 
 
-def display_main_menu() -> None:
-    """
-    Renders the primary navigation menu.
-    """
-    print("\n" + "=" * 50)
-    print("      FRIDGE RECIPE TRACKER - MAIN MENU")
-    print("=" * 50)
-    print("  [1] View Fridge & Pantry Inventory")
-    print("  [2] Add / Update Food Item")
-    print("  [3] Remove Food Item")
-    print("  [4] AI Recipe Generator (Based on Expiry & Time)")
-    print("  [5] Search & View Recipe History")
-    print("  [6] View Items Expiring Soon (Urgent Rescue)")
-    print("  [7] Exit Application")
-    print("=" * 50)
+class NumberField(FormField):
+    """A positive, finite number; optionally a whole number with an upper limit."""
 
+    def __init__(self, name: str, label: str, whole: bool = False, maximum: float | None = None) -> None:
+        super().__init__(name, label)
+        self._whole = whole
+        self._maximum = maximum
 
-def prompt_menu_choice(min_val: int = 1, max_val: int = 7) -> int:
-    """
-    Prompts user for menu choice. Re-prompts continuously on invalid input.
-    """
-    while True:
+    def _convert(self, text: str) -> int | float:
         try:
-            raw = input(f"Enter option [{min_val}-{max_val}]: ").strip()
-            if not raw:
-                print("Input cannot be empty. Please enter a valid number.")
-                continue
-            choice = int(raw)
-            if min_val <= choice <= max_val:
-                return choice
-            print(f"Invalid option. Please choose between {min_val} and {max_val}.")
+            value: int | float = int(text) if self._whole else float(text)
         except ValueError:
-            print("Invalid input. Please enter a numeric digit.")
+            kind = "a whole number" if self._whole else "a number"
+            raise FieldError(f"{self._label} must be {kind}.") from None
+        if not math.isfinite(value) or value <= 0:
+            raise FieldError(f"{self._label} must be greater than 0.")
+        if self._maximum is not None and value > self._maximum:
+            raise FieldError(f"{self._label} must be at most {self._maximum:g}.")
+        return value
 
 
-def prompt_string(label: str, allow_empty: bool = False) -> str:
-    """
-    Prompts for a text string, rejecting empty inputs if allow_empty is False.
-    """
-    while True:
-        val = input(f"{label}: ").strip()
-        if val or allow_empty:
-            return val
-        print("Value cannot be blank. Please enter a valid text.")
-
-
-def prompt_positive_number(label: str, is_float: bool = False) -> float | int:
-    """
-    Prompts for a strictly positive number. Re-prompts on non-numeric or negative input.
-    """
-    while True:
-        raw = input(f"{label}: ").strip()
+class DateField(FormField):
+    def _convert(self, text: str) -> date:
         try:
-            val = float(raw) if is_float else int(raw)
-            if not math.isfinite(val):
-                print("Number must be a finite value.")
-                continue
-            if val > 0:
-                return val
-            print("Number must be strictly greater than 0.")
+            return datetime.strptime(text, DATE_FORMAT).date()
         except ValueError:
-            expected = "a decimal number" if is_float else "a whole number"
-            print(f"Invalid input. Please enter {expected}.")
+            raise FieldError(f"{self._label} must be a real date in YYYY-MM-DD format.") from None
 
 
-def prompt_date(label: str) -> str:
-    """
-    Prompts for a date strictly in YYYY-MM-DD format. Re-prompts until valid.
-    """
-    while True:
-        raw = input(f"{label} (YYYY-MM-DD): ").strip()
-        try:
-            parsed = datetime.strptime(raw, "%Y-%m-%d")
-            return parsed.strftime("%Y-%m-%d")
-        except ValueError:
-            print("Invalid date format. Please use exactly YYYY-MM-DD (e.g., 2026-09-25).")
+class ChoiceField(FormField):
+    def __init__(self, name: str, label: str, choices: Iterable[str], required: bool = True) -> None:
+        super().__init__(name, label, required)
+        self._choices = tuple(choices)
+
+    @property
+    def choices(self) -> tuple[str, ...]:
+        return self._choices
+
+    def _convert(self, text: str) -> str:
+        match = next((c for c in self._choices if c.lower() == text.lower()), None)
+        if match is None:
+            raise FieldError(f"{self._label} must be one of: {', '.join(self._choices)}.")
+        return match
 
 
-def prompt_storage_location() -> str:
-    """
-    Prompts user to select storage location.
-    """
-    print("\nSelect Storage Location:")
-    print("  [1] Fridge")
-    print("  [2] Pantry")
-    while True:
-        c = input("Choice [1-2]: ").strip()
-        if c == "1":
-            return "Fridge"
-        if c == "2":
-            return "Pantry"
-        print("Invalid choice. Enter 1 for Fridge or 2 for Pantry.")
+class ListField(FormField):
+    """Comma-separated values, e.g. 'peanuts, dairy'. Blank entries are dropped."""
 
+    def __init__(self, name: str, label: str, max_items: int = 10) -> None:
+        super().__init__(name, label, required=False)
+        self._max_items = max_items
 
-def prompt_meal_type() -> str:
-    """
-    Prompts user to select meal category.
-    """
-    print("\nSelect Desired Meal Type:")
-    print("  [1] Breakfast")
-    print("  [2] Lunch")
-    print("  [3] Dinner")
-    print("  [4] Snack")
-    mapping = {"1": "Breakfast", "2": "Lunch", "3": "Dinner", "4": "Snack"}
-    while True:
-        c = input("Select [1-4]: ").strip()
-        if c in mapping:
-            return mapping[c]
-        print("Invalid choice. Please select 1, 2, 3, or 4.")
-
-
-def prompt_allergies() -> list[str]:
-    """
-    Prompts user for comma-separated allergies or dietary restrictions.
-    """
-    print("\nEnter any allergies or items to strictly avoid (comma-separated, e.g. peanuts, dairy, gluten).")
-    raw = input("Allergies (or press Enter if none): ").strip()
-    if not raw:
+    def empty_value(self) -> list[str]:
         return []
-    return [a.strip() for a in raw.split(",") if a.strip()]
+
+    def _convert(self, text: str) -> list[str]:
+        items = list(dict.fromkeys(part.strip() for part in text.split(",") if part.strip()))
+        if len(items) > self._max_items:
+            raise FieldError(f"{self._label} can list at most {self._max_items} items.")
+        if any(len(item) > 40 for item in items):
+            raise FieldError(f"Each entry in {self._label} must be at most 40 characters.")
+        return items
 
 
-def prompt_new_ingredient() -> dict:
-    """
-    Collects complete structured data for an ingredient with input validation.
-    """
-    print_banner("Add New Item to Inventory")
-    name = prompt_string("Ingredient Name (e.g. Eggs, Milk, Spinach)")
-    location = prompt_storage_location()
-    qty = prompt_positive_number("Quantity", is_float=True)
-    unit = prompt_string("Unit of Measure (e.g. pcs, g, ml, slices, pack)")
-    expiry = prompt_date("Expiry Date")
+class Form:
+    """A set of fields validated together. Composes its fields: they are created for and owned by the form."""
 
-    return {
-        "name": name,
-        "location": location,
-        "quantity": qty,
-        "unit": unit,
-        "expiry_date": expiry
-    }
+    def __init__(self, fields: Iterable[FormField]) -> None:
+        self._fields = tuple(fields)
 
+    @property
+    def fields(self) -> tuple[FormField, ...]:
+        return self._fields
 
-def prompt_recipe_generation_criteria() -> dict:
-    """
-    Gathers structured preferences from user for recipe generation,
-    including specific mandatory ingredients and cooking style.
-    """
-    print_banner("AI Recipe Recommendation Request")
-    meal = prompt_meal_type()
-    cook_time = prompt_positive_number("Maximum Cooking Time in minutes (e.g., 15, 30, 45)", is_float=False)
-    allergies = prompt_allergies()
-    mandatory_raw = prompt_string(
-        "Specific ingredient(s) you MUST include? (e.g. Eggs, Cheese, or press Enter for any)",
-        allow_empty=True
-    )
-    mandatory_list = [m.strip() for m in mandatory_raw.split(",") if m.strip()] if mandatory_raw else []
-    notes = prompt_string("Any cooking style preferences? (e.g., stir-fry, soup, one-pot, or press Enter)", allow_empty=True)
-
-    return {
-        "meal_type": meal,
-        "max_cook_time_mins": int(cook_time),
-        "allergies": allergies,
-        "mandatory_ingredients": mandatory_list,
-        "additional_notes": notes
-    }
+    def clean(self, data: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, str]]:
+        values: dict[str, Any] = {}
+        errors: dict[str, str] = {}
+        for field in self._fields:
+            try:
+                values[field.name] = field.clean(data.get(field.name))
+            except FieldError as err:
+                errors[field.name] = str(err)
+        return values, errors
 
 
-def display_inventory(inventory: list[dict]) -> None:
-    """
-    Formats inventory items into an aligned table with expiry urgency badges.
-    """
-    print_banner("Current Fridge & Pantry Inventory")
-    if not inventory:
-        print("Your inventory is currently empty. Add items using option [2].")
-        return
+class FormResult(Generic[T]):
+    """Either a validated object or the per-field errors, plus the submitted text to redisplay."""
 
-    today = datetime.now().date()
-    header_fmt = "{:<6} | {:<20} | {:<12} | {:<10} | {:<12} | {:<15}"
-    row_fmt    = "{:<6} | {:<20} | {:<12} | {:<10} | {:<12} | {:<15}"
+    def __init__(self, value: T | None, errors: Mapping[str, str], submitted: Mapping[str, str]) -> None:
+        self._value = value
+        self._errors = dict(errors)
+        self._submitted = dict(submitted)
 
-    print(header_fmt.format("ID", "Item Name", "Quantity", "Location", "Expiry Date", "Status"))
-    print_divider()
+    @property
+    def ok(self) -> bool:
+        return self._value is not None and not self._errors
 
-    for item in inventory:
-        item_id = item.get("id", "N/A")
-        name = item.get("name", "Unknown")
-        qty_str = f"{item.get('quantity', 0)} {item.get('unit', '')}"
-        loc = item.get("location", "Fridge")
-        exp_str = item.get("expiry_date", "N/A")
+    @property
+    def value(self) -> T | None:
+        return self._value
 
-        status_badge = "Fresh"
-        try:
-            exp_date = datetime.strptime(exp_str, "%Y-%m-%d").date()
-            diff = (exp_date - today).days
-            if diff < 0:
-                status_badge = "[EXPIRED]"
-            elif diff == 0:
-                status_badge = "[EXPIRES TODAY]"
-            elif diff <= 3:
-                status_badge = f"[SOON ({diff}d)]"
-            else:
-                status_badge = f"OK ({diff}d left)"
-        except (ValueError, TypeError):
-            status_badge = "Unknown"
+    @property
+    def errors(self) -> dict[str, str]:
+        return self._errors
 
-        print(row_fmt.format(item_id, name[:20], qty_str[:12], loc[:10], exp_str[:12], status_badge))
-
-    print_divider()
-    print(f"Total items tracked: {len(inventory)}")
+    @property
+    def submitted(self) -> dict[str, str]:
+        return self._submitted
 
 
-def display_recipe_card(recipe: dict, evaluation: dict) -> None:
-    """
-    Renders a formatted card displaying the AI-generated recipe alongside
-    the required kitchen tools, ingredients, and domain logic evaluation rules.
-    """
-    print_banner(f"Recipe: {recipe.get('recipe_name', 'Untitled')}")
-    outcome = evaluation.get("outcome", "UNKNOWN")
-    print(f"Outcome Status  : [{outcome}] - {evaluation.get('status_code', '')}")
-    print(f"Evaluation Notes: {evaluation.get('status_message', '')}")
-    print_divider()
+class IOManager:
+    """Validates everything the user submits and prepares domain objects for display."""
 
-    print(f"Meal Type       : {recipe.get('meal_type', 'Any')}")
-    print(f"Est. Cook Time  : {recipe.get('estimated_cook_time_mins', 0)} minutes")
-    print(f"Match Ratio     : {evaluation.get('match_percentage', 0)}% of required ingredients available")
-    print(f"Expiry Priority : {evaluation.get('expiry_priority_score', 0)} / 100 (Urgency score)")
-    print(f"Food Waste Saved: ~{evaluation.get('waste_diverted_grams', 0)} grams diverted from disposal")
+    OUTCOME_STYLES = {Outcome.ACCEPTED: "accepted", Outcome.FLAGGED: "flagged", Outcome.REJECTED: "rejected"}
+    EXPIRY_LABELS = {"expired": "Expired", "today": "Expires today", "unknown": "No date"}
 
-    # Display Required Kitchen Tools
-    tools = recipe.get("required_tools", [])
-    if tools:
-        print("\nRequired Kitchen Tools & Equipment:")
-        for t in tools:
-            print(f"  [Tool] {t}")
+    def __init__(self) -> None:
+        self._ingredient_form = Form([
+            TextField("name", "Ingredient name", max_length=60),
+            NumberField("quantity", "Quantity", maximum=100000),
+            TextField("unit", "Unit", max_length=20),
+            ChoiceField("location", "Storage location", Ingredient.LOCATIONS),
+            DateField("expiry_date", "Expiry date"),
+        ])
+        self._request_form = Form([
+            ChoiceField("meal_type", "Meal type", RecipeRequest.MEAL_TYPES),
+            NumberField("max_cook_time_mins", "Maximum cooking time", whole=True, maximum=RecipeRequest.MAX_COOK_TIME),
+            ListField("allergies", "Allergies"),
+            ListField("mandatory_ingredients", "Must-include ingredients"),
+            TextField("notes", "Cooking style", max_length=200, required=False),
+        ])
 
-    print("\nIngredients Used From Your Kitchen:")
-    for ing in recipe.get("ingredients_used", []):
-        print(f"  + {ing}")
+    @property
+    def meal_types(self) -> tuple[str, ...]:
+        return RecipeRequest.MEAL_TYPES
 
-    missing = recipe.get("missing_ingredients", [])
-    if missing:
-        print("\nMissing / Extra Ingredients Needed:")
-        for m in missing:
-            print(f"  - {m}")
-    else:
-        print("\nMissing Ingredients: None! You have everything required.")
+    @property
+    def locations(self) -> tuple[str, ...]:
+        return Ingredient.LOCATIONS
 
-    # Status on mandatory ingredients
-    if evaluation.get("missing_mandatory"):
-        print(f"\n[!] Note: Missing requested ingredient(s): {', '.join(evaluation.get('missing_mandatory'))}")
-    elif evaluation.get("mandatory_met") and evaluation.get("missing_mandatory") is not None:
-        print("\n[OK] All requested must-have ingredients are included in this dish!")
+    @property
+    def outcomes(self) -> tuple[str, ...]:
+        return tuple(o.value for o in Outcome)
 
-    print("\nCooking Instructions:")
-    for idx, step in enumerate(recipe.get("instructions", []), 1):
-        print(f"  {idx}. {step}")
+    def parse_ingredient(self, form: Mapping[str, Any]) -> FormResult[Ingredient]:
+        values, errors = self._ingredient_form.clean(form)
+        ingredient = None
+        if not errors:
+            try:
+                ingredient = Ingredient(values["name"], values["quantity"], values["unit"],
+                                        values["expiry_date"], values["location"])
+            except ValueError as err:
+                errors["name"] = str(err)
+        return FormResult(ingredient, errors, self._submitted(form, self._ingredient_form))
 
-    notes = recipe.get("waste_reduction_notes", "")
-    if notes:
-        print(f"\nSustainability Tip: {notes}")
+    def parse_recipe_request(self, form: Mapping[str, Any]) -> FormResult[RecipeRequest]:
+        values, errors = self._request_form.clean(form)
+        request = None
+        if not errors:
+            try:
+                request = RecipeRequest(**values)
+            except ValueError as err:
+                errors["meal_type"] = str(err)
+        return FormResult(request, errors, self._submitted(form, self._request_form))
 
-    rescued = evaluation.get("rescued_items", [])
-    if rescued:
-        print("\nNear-Expiry Ingredients Rescued:")
-        for r in rescued:
-            print(f"  * {r.get('name')} (Expires in {r.get('days_until_expiry')} days)")
+    def parse_history_filter(self, args: Mapping[str, Any]) -> tuple[RecordFilter, dict[str, str]]:
+        """Builds the history search from the query string. Unknown values are ignored, not errors."""
+        selected = {key: str(args.get(key, "")).strip() for key in ("meal_type", "ingredient", "outcome")}
+        filters: list[RecordFilter] = []
+        meal = next((m for m in self.meal_types if m.lower() == selected["meal_type"].lower()), None)
+        if meal:
+            filters.append(MealTypeFilter(meal))
+        else:
+            selected["meal_type"] = ""
+        if selected["ingredient"]:
+            selected["ingredient"] = selected["ingredient"][:40]
+            filters.append(IngredientFilter(selected["ingredient"]))
+        outcome = next((o for o in Outcome if o.value == selected["outcome"].upper()), None)
+        if outcome:
+            filters.append(OutcomeFilter(outcome))
+            selected["outcome"] = outcome.value
+        else:
+            selected["outcome"] = ""
+        return AllFilters(filters), selected
 
-    print_divider()
+    def expiry_badge(self, ingredient: Ingredient, today: date) -> tuple[str, str]:
+        """(label, style) for an ingredient's freshness, e.g. ('2 days left', 'soon')."""
+        status = ingredient.expiry_status(today)
+        if status in self.EXPIRY_LABELS:
+            return self.EXPIRY_LABELS[status], status
+        days = ingredient.days_until_expiry(today)
+        return f"{days} day{'s' if days != 1 else ''} left", status
 
+    def outcome_style(self, outcome: Outcome) -> str:
+        return self.OUTCOME_STYLES.get(outcome, "flagged")
 
-def display_recipe_history(history: list[dict]) -> None:
-    """
-    Renders historical recipe records including required tools.
-    """
-    print_banner("Saved Recipe History")
-    if not history:
-        print("No recipes have been saved to history yet.")
-        return
+    @staticmethod
+    def format_quantity(quantity: float | None, unit: str) -> str:
+        if quantity is None:
+            return unit
+        return f"{quantity:g} {unit}".strip()
 
-    for idx, record in enumerate(history, 1):
-        recipe = record.get("recipe", {})
-        eval_data = record.get("evaluation", {})
-        created_at = record.get("created_at", "N/A")
-
-        print(f"\n[{idx}] {recipe.get('recipe_name', 'Unnamed Recipe')} (Saved on: {created_at})")
-        print(f"    Meal Type    : {recipe.get('meal_type')} | Time: {recipe.get('estimated_cook_time_mins')} mins")
-        print(f"    Match Ratio  : {eval_data.get('match_percentage', 0)}% | Outcome: {eval_data.get('outcome')}")
-        tools_str = ", ".join(recipe.get("required_tools", [])) or "Standard Utensils"
-        print(f"    Tools Needed : {tools_str}")
-        print(f"    Ingredients  : {', '.join(recipe.get('ingredients_used', []))}")
-        print("-" * 50)
-
-
-def prompt_history_filter() -> dict:
-    """
-    Asks how to filter recipe history and returns a typed filter request:
-    {"mode": "all"} | {"mode": "meal_type", "value": <meal>} | {"mode": "ingredient", "value": <text>}.
-    """
-    print_banner("Recipe History Explorer")
-    print_divider()
-    while True:
-        choice = input("Filter by: [A]ll, [M]eal Type, [I]ngredient search (A/M/I): ").strip().upper()
-        if choice == "A":
-            return {"mode": "all"}
-        if choice == "M":
-            return {"mode": "meal_type", "value": prompt_meal_type()}
-        if choice == "I":
-            return {"mode": "ingredient", "value": prompt_string("Enter ingredient name to search for")}
-        print("Invalid choice. Please enter A, M or I.")
-
-
-def display_check_results(title: str, results: list[tuple[str, bool, str]]) -> None:
-    """
-    Renders a pass/fail report, e.g. for the automated test suite.
-    results: (check name, passed, failure detail) tuples.
-    """
-    line = "=" * 60
-    print("\n" + line)
-    print(title.upper())
-    print(line)
-    for name, passed, detail in results:
-        print(f"[{'PASS' if passed else 'FAIL'}] {name}")
-        if not passed and detail:
-            print(detail.rstrip())
-    passed_count = sum(1 for _, passed, _ in results if passed)
-    print(line)
-    print(f"Results: {passed_count}/{len(results)} tests passed.")
-    print(line)
-
-
-def prompt_continue() -> None:
-    """
-    Pauses output until user presses Enter.
-    """
-    input("\nPress Enter to continue...")
-
+    @staticmethod
+    def _submitted(form: Mapping[str, Any], spec: Form) -> dict[str, str]:
+        return {field.name: str(form.get(field.name, "") or "") for field in spec.fields}
