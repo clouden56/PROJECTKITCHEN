@@ -5,13 +5,13 @@ services:
       dockerfile: Dockerfile
     image: projectkitchen:latest
     container_name: fridge_recipe_tracker
-    stdin_open: true
-    tty: true
+    ports:
+      - "5000:5000"
     env_file:
-      - .env
+      - path: .env
+        required: false
     volumes:
       - ./data:/app/data
-    command: ["python", "main.py"]
 
   test:
     build:
@@ -20,5 +20,4 @@ services:
     image: projectkitchen:latest
     container_name: fridge_recipe_tracker_test
     # Deliberately no env_file / API key: the suite must pass fully offline
-    command: ["python", "tests/test_pipeline.py"]
-
+    command: ["python", "-m", "unittest", "discover", "-s", "tests", "-t", ".", "-v"]
